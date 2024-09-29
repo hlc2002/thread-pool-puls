@@ -128,7 +128,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         volatile long completedTasks;
 
         Worker(Runnable firstTask) {
-            setState(-1);
+            setState(-1); // 初始化中断态 -1 当此值修改为 0 意味着线程运行
             this.firstTask = firstTask;
             thread = new Thread(this);
         }
@@ -191,7 +191,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private boolean addWorker(Runnable firstTask, boolean core) {
         loop:
         for (int state = ctl.get(); ; ) {
-            if (state >= STOP)
+            if (state >= STOP) // 线程池已停止 直接拒绝添加核心 worker
                 return false;
             while (true) {
                 // 核心或非核心线程数 过载，即拒绝直接添加 worker （这里是先插队的思路）
@@ -201,23 +201,23 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                 if (compareAndIncrementWorkerCount(state)) // 核心线程数增加成功 插队成功 跳出大循环体（比较与交换的思维）
                     break loop;
                 state = ctl.get(); // 添加失败继续自旋重试 直到成功
-                if (state >= SHUTDOWN)
+                if (state >= SHUTDOWN) // 线程池已停止，重新进入大循环体
                     continue loop;
                 // 如果线程池未停止，该工作线程 自旋 的被添加进原子整数中。
             }
         }
 
-        boolean addWorker = false;
-        boolean workerStart = false;
+        boolean addWorker = false; // 初始化添加成功标识
+        boolean workerStart = false; // 初始化启动线程标识
 
-        Worker worker = null;
+        Worker worker = null; // 初始化工作线程
         try {
             worker = new Worker(firstTask);
             final Thread waitAddThread = worker.thread;
 
             if (waitAddThread != null) {
                 final ReentrantLock lock = this.mainLock;
-                lock.lock();
+                lock.lock(); // 按住线程池内的共享可重入锁 按不住的阻塞
                 try {
                     int state = ctl.get();
                     if (state >= RUNNING || (state >= STOP && firstTask == null)) {
@@ -233,19 +233,19 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                     lock.unlock();
                 }
                 if (addWorker) {
-                    waitAddThread.start(); // 启动线程
+                    waitAddThread.start(); // 启动线程 启用VM底层的 SharedThreadContainer 来管理线程
                     workerStart = true;
                 }
             }
         } finally {
-            if (!workerStart) {
+            if (!workerStart) { // 启动失败 则释放线程池内的资源
                 final ReentrantLock mainLock = this.mainLock;
                 mainLock.lock();
                 try {
                     if (worker != null)
                         workers.remove(worker);
-                    decrementWorkerCount();
-                    tryTerminate();
+                    decrementWorkerCount(); // 释放线程池内的资源
+                    tryTerminate(); // 尝试终止线程池
                 } finally {
                     mainLock.unlock();
                 }
