@@ -1,4 +1,4 @@
-package com.spring.springthread.pool;
+package com.spring.springthread.executor;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -10,7 +10,7 @@ import java.util.concurrent.TimeoutException;
  * @apiNote
  * @version 1.0
  */
-public class FutureTask<V> implements RunnableFuture<V>{
+public class FutureTask<V> implements RunnableFuture<V> {
     private final Runnable runnable;
     private final V result;
 

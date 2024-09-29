@@ -1,13 +1,12 @@
 package com.spring.springthread.pool;
 
+import com.spring.springthread.executor.AbstractExecuteSupport;
 import com.spring.springthread.executor.DefaultRejectedHandler;
 import com.spring.springthread.executor.RejectedHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;

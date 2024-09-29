@@ -1,6 +1,4 @@
-package com.spring.springthread.pool;
-
-import jakarta.annotation.Nullable;
+package com.spring.springthread.executor;
 
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;

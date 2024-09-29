@@ -1,4 +1,4 @@
-package com.spring.springthread.pool;
+package com.spring.springthread.executor;
 
 import java.util.concurrent.Future;
 

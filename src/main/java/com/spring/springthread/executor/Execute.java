@@ -1,6 +1,4 @@
-package com.spring.springthread.pool;
-
-import java.util.concurrent.Callable;
+package com.spring.springthread.executor;
 
 /**
  * @author spring
