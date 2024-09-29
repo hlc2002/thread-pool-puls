@@ -179,19 +179,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
 
         public void lock() {
-            try {
-                acquire(1);
-            } catch (Exception e) {
-                System.out.println("AQS lock acquire fail");
-            }
+            acquire(1);
         }
 
         public void unlock() {
-            try {
-                release(1);
-            } catch (Exception e) {
-                System.out.println("AQS lock release fail");
-            }
+            release(1);
         }
 
         public boolean isLocked() {
@@ -338,15 +330,15 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     protected void beforeExecute(Thread thread, Runnable task) {
-        System.out.println("before execute");
+
     }
 
     protected void afterExecute(Runnable runnable, Throwable throwable) {
-        System.out.println("after execute");
+
     }
 
     private void processWorkerExit(Worker worker, boolean completedAbruptly) {
-        System.out.println("worker exit");
+
     }
 
     public boolean remove(Runnable runnable) {
@@ -375,17 +367,22 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     public static void main0() {
-        ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 5, 10,
+        ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 3, 10,
                 TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
-        CountDownLatch countDownLatch = new CountDownLatch(1);
         threadPoolExecuteSupport.execute(() -> {
-            System.out.println("hello world");
-            countDownLatch.countDown();
+            System.out.println("hello world ! " + 1);
         });
-        try {
-            countDownLatch.await();
-        } catch (InterruptedException e) {
-            System.out.println("异常发生");
-        }
+        threadPoolExecuteSupport.execute(() -> {
+            System.out.println("hello world ! " + 2);
+        });
+        threadPoolExecuteSupport.execute(() -> {
+            System.out.println("hello world ! " + 3);
+        });
+        threadPoolExecuteSupport.execute(() -> {
+            System.out.println("hello world ! " + 4);
+        });
+        threadPoolExecuteSupport.execute(() -> {
+            System.out.println("hello world ! " + 5);
+        });
     }
 }
