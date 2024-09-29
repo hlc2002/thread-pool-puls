@@ -70,11 +70,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private static final int TERMINATED = 3 << COUNT_BITS;
 
     private static int runStateOf(int c) {
-        return c & ~COUNT_MASK;
+        return c & ~COUNT_MASK; // ~ 是按位取反 即 ~COUNT_MASK = 1110 0000 0000 0000 0000 0000 0000 0000
     }
 
     private static int workerCountOf(int c) {
-        return c & COUNT_MASK;
+        return c & COUNT_MASK; // COUNT_MASK = 0001 1111 1111 1111 1111 1111 1111 1111
     }
 
     private static int ctlOf(int rs, int wc) {
