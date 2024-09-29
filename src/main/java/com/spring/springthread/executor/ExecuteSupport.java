@@ -12,10 +12,6 @@ import java.util.concurrent.TimeUnit;
  */
 public interface ExecuteSupport extends Execute, Runnable, AutoCloseable {
 
-    <T> T submit(Callable<T> command);
-
-    Future<?> submit(Runnable command);
-
     boolean isShutdown();
 
     boolean isTerminated();

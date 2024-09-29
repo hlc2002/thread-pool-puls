@@ -16,16 +16,6 @@ public abstract class AbstractExecuteSupport implements ExecuteSupport {
     public AbstractExecuteSupport() {
     }
 
-    @Override
-    public Future<?> submit(Runnable task) {
-        if (task == null) {
-            throw new NullPointerException("task is null !");
-        }
-        Future<?> future = new FutureTask<>(task, null);
-        execute(task);
-        return future;
-    }
-
 
     @Override
     public boolean isShutdown() {

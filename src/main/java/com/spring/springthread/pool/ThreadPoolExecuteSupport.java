@@ -99,19 +99,28 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private final ReentrantLock mainLock = new ReentrantLock();
 
     @Override
-    public <T> T submit(Callable<T> command) {
-        return null;
-    }
-
-
-    @Override
     public void run() {
 
     }
 
     @Override
     public void execute(Runnable command) {
-
+        if (command == null)
+            throw new NullPointerException("command is null !");
+        if (workerCountOf(ctl.get()) < corePoolSize) {
+            if (addWorker(command, true)) {
+                return;
+            }
+        }
+        if (ctl.get() < SHUTDOWN && runnableQueue.offer(command)) {
+            if (ctl.get() >= SHUTDOWN && remove(command)) {
+                rejected(command);
+            } else if (workerCountOf(ctl.get()) == 0) {
+                addWorker(null, false);
+            }
+        } else if (!addWorker(command, false)) {
+            rejected(command);
+        }
     }
 
     final void tryTerminate() {
@@ -330,6 +339,12 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
 
     }
 
+    public boolean remove(Runnable runnable) {
+        boolean remove = runnableQueue.remove(runnable);
+        tryTerminate();
+        return remove;
+    }
+
     public ThreadPoolExecuteSupport(int corePoolSize, int maximumPoolSize, long keepAliveTime,
                                     TimeUnit unit, BlockingQueue<Runnable> taskQueue) {
         this(corePoolSize, maximumPoolSize, keepAliveTime, unit, taskQueue, new DefaultRejectedHandler());
@@ -343,5 +358,17 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         this.keepAliveTime = unit.toNanos(keepAliveTime);
         this.runnableQueue = taskQueue;
         this.handler = rejectedHandler;
+    }
+
+    public static void main(String[] args) {
+        main0();
+    }
+
+    public static void main0() {
+        ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 5, 10,
+                TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        threadPoolExecuteSupport.execute(() -> {
+            System.out.println("hello world");
+        });
     }
 }
