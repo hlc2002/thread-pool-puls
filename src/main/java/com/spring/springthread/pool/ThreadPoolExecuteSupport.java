@@ -1,5 +1,6 @@
 package com.spring.springthread.pool;
 
+import com.spring.springthread.executor.DefaultRejectedHandler;
 import com.spring.springthread.executor.RejectedHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -83,8 +84,13 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private LinkedBlockingQueue<Runnable> taskQueue;
 
     private volatile RejectedHandler handler;
+    private volatile DefaultRejectedHandler defaultRejectedHandler;
 
     final void rejected(Runnable command) {
+        if (handler == null) {
+            defaultRejectedHandler.rejected(command, this);
+            return;
+        }
         handler.rejected(command, this);
     }
 
