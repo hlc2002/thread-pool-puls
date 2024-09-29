@@ -80,24 +80,21 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         return rs | wc;
     }
 
-    private LinkedBlockingQueue<Worker> workerQueue;
     private final HashSet<Worker> workers = new HashSet<>();
-    private LinkedBlockingQueue<Runnable> taskQueue;
+    private BlockingQueue<Runnable> runnableQueue;
 
     private volatile RejectedHandler handler;
-    private volatile DefaultRejectedHandler defaultRejectedHandler;
 
     final void rejected(Runnable command) {
-        if (handler == null) {
-            defaultRejectedHandler.rejected(command, this);
-            return;
-        }
         handler.rejected(command, this);
     }
 
     private volatile int corePoolSize;
     private volatile int maximumPoolSize;
     private volatile int largestPoolSize;
+
+    private volatile boolean allowCoreThreadTimeOut;
+    private volatile long keepAliveTime;
 
     private final ReentrantLock mainLock = new ReentrantLock();
 
@@ -142,7 +139,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
 
         @Override
         public void run() {
-            firstTask.run();
+            runWorker(this);
         }
 
         @Override
@@ -259,5 +256,92 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             }
         }
         return workerStart;
+    }
+
+    final void runWorker(Worker worker) {
+        Thread currentThread = Thread.currentThread();
+        Runnable task = worker.firstTask;
+        worker.firstTask = null;
+        worker.unlock(); // 允许中断
+        boolean completedAbruptly = true; // 突然结束
+        try {
+            while (task != null || (task = getTask()) != null) {
+                worker.lock(); // 不允许中断
+                if ((ctl.get() >= STOP || Thread.interrupted() && ctl.get() >= STOP) && !currentThread.isInterrupted()) {
+                    currentThread.interrupt();
+                }
+                try {
+                    beforeExecute(currentThread, task);
+                    try {
+                        task.run();
+                        afterExecute(task, null);
+                    } catch (Exception e) {
+                        afterExecute(task, e);
+                        throw e;
+                    }
+                } finally {
+                    task = null;
+                    worker.completedTasks++;
+                    worker.unlock();
+                }
+            }
+            completedAbruptly = false;
+        } finally {
+            processWorkerExit(worker, completedAbruptly);
+        }
+    }
+
+    private Runnable getTask() {
+        boolean timedOut = false; // 不允许超时
+        for (; ; ) {
+            if (ctl.get() >= SHUTDOWN && runnableQueue.isEmpty()) {
+                decrementWorkerCount();
+                return null;
+            }
+            int workerCount = workerCountOf(ctl.get());
+            boolean timed = allowCoreThreadTimeOut || workerCount > corePoolSize;
+            if ((workerCount > maximumPoolSize || (timedOut && allowCoreThreadTimeOut)) && (workerCount > 1 || runnableQueue.isEmpty())) {
+                if (compareAndDecrementWorkerCount(ctl.get()))
+                    return null;
+                continue;
+            }
+
+            try {
+                // 工作线程数量已经大于核心线程数 或 允许线程超时 时 延时获取任务 否则直接获取runnable queue 中的头部任务
+                Runnable runnable = timed ? runnableQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : runnableQueue.take();
+                if (runnable != null)
+                    return runnable;
+                timedOut = true;
+            } catch (InterruptedException e) {
+                timedOut = false;
+            }
+        }
+    }
+
+    protected void beforeExecute(Thread thread, Runnable task) {
+
+    }
+
+    protected void afterExecute(Runnable runnable, Throwable throwable) {
+
+    }
+
+    private void processWorkerExit(Worker worker, boolean completedAbruptly) {
+
+    }
+
+    public ThreadPoolExecuteSupport(int corePoolSize, int maximumPoolSize, long keepAliveTime,
+                                    TimeUnit unit, BlockingQueue<Runnable> taskQueue) {
+        this(corePoolSize, maximumPoolSize, keepAliveTime, unit, taskQueue, new DefaultRejectedHandler());
+    }
+
+    public ThreadPoolExecuteSupport(int corePoolSize, int maximumPoolSize, long keepAliveTime,
+                                    TimeUnit unit, BlockingQueue<Runnable> taskQueue,
+                                    RejectedHandler rejectedHandler) {
+        this.corePoolSize = corePoolSize;
+        this.maximumPoolSize = maximumPoolSize;
+        this.keepAliveTime = unit.toNanos(keepAliveTime);
+        this.runnableQueue = taskQueue;
+        this.handler = rejectedHandler;
     }
 }
