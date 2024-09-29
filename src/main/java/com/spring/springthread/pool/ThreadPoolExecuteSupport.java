@@ -23,10 +23,10 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     /**
      * 在运行的线程数量
      */
-    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0)); // 默认为 RUNNING 状态
 
     private boolean compareAndIncrementWorkerCount(int expect) {
-        return ctl.compareAndSet(expect, expect + 1);
+        return ctl.compareAndSet(expect, expect + 1); // 比较并交换 需要重试直到成功
     }
 
     private boolean compareAndDecrementWorkerCount(int expect) {
@@ -34,7 +34,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     private void decrementWorkerCount() {
-        ctl.addAndGet(-1);
+        ctl.addAndGet(-1); // 减一
     }
 
     /**
@@ -45,6 +45,8 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
      * 0001 1111 1111 1111   1111 1111 1111 1111
      */
     private static final int COUNT_MASK = (1 << COUNT_BITS) - 1;
+    // 我们会发现高三位代表线程池状态 低29位代表线程数量
+    // 111 运行 000 关闭 001 停止 010 整理 011 销毁
     /**
      * 1110 0000 0000 0000   0000 0000 0000 0000
      * 0000 0000 0000 0000   0000 0000 0000 0011
@@ -59,11 +61,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
      */
     private static final int STOP = 1 << COUNT_BITS;
     /**
-     * 0010 0000 0000 0000   0000 0000 0000 0000
+     * 0100 0000 0000 0000   0000 0000 0000 0000
      */
     private static final int TIDYING = 2 << COUNT_BITS;
     /**
-     * 0011 0000 0000 0000   0000 0000 0000 0000
+     * 0110 0000 0000 0000   0000 0000 0000 0000
      */
     private static final int TERMINATED = 3 << COUNT_BITS;
 
