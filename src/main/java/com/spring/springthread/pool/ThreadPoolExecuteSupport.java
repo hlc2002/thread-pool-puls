@@ -135,6 +135,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     @SuppressWarnings("all")
     private final class Worker extends AbstractQueuedSynchronizer
             implements Runnable {
+        private static final long serialVersionUID = 6138294804551838833L;
 
         final Thread thread;
         Runnable firstTask;
@@ -178,11 +179,19 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
 
         public void lock() {
-            acquire(1);
+            try {
+                acquire(1);
+            } catch (Exception e) {
+                System.out.println("AQS lock acquire fail");
+            }
         }
 
         public void unlock() {
-            release(1);
+            try {
+                release(1);
+            } catch (Exception e) {
+                System.out.println("AQS lock release fail");
+            }
         }
 
         public boolean isLocked() {
@@ -195,6 +204,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                 try {
                     t.interrupt();
                 } catch (SecurityException ignore) {
+                    System.out.println("SecurityException");
                 }
             }
         }
@@ -328,15 +338,15 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     protected void beforeExecute(Thread thread, Runnable task) {
-
+        System.out.println("before execute");
     }
 
     protected void afterExecute(Runnable runnable, Throwable throwable) {
-
+        System.out.println("after execute");
     }
 
     private void processWorkerExit(Worker worker, boolean completedAbruptly) {
-
+        System.out.println("worker exit");
     }
 
     public boolean remove(Runnable runnable) {
@@ -367,8 +377,15 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     public static void main0() {
         ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 5, 10,
                 TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        CountDownLatch countDownLatch = new CountDownLatch(1);
         threadPoolExecuteSupport.execute(() -> {
             System.out.println("hello world");
+            countDownLatch.countDown();
         });
+        try {
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            System.out.println("异常发生");
+        }
     }
 }
