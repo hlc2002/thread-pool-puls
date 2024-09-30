@@ -523,14 +523,22 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     public static void main0() {
         ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 3, 10,
                 TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        CountDownLatch countDownLatch = new CountDownLatch(2);
         threadPoolExecuteSupport.execute(() -> {
+            try {
+                countDownLatch.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             System.out.println("hello world ! " + 1);
         });
         threadPoolExecuteSupport.execute(() -> {
             System.out.println("hello world ! " + 2);
+            countDownLatch.countDown();
         });
         threadPoolExecuteSupport.execute(() -> {
             System.out.println("hello world ! " + 3);
+            countDownLatch.countDown();
         });
         threadPoolExecuteSupport.execute(() -> {
             System.out.println("hello world ! " + 4);
