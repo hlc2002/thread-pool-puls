@@ -38,7 +38,7 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     /**
-     * 在运行的线程数量
+     * 原子整数 存储 线程池状态与线程数量
      */
     private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0)); // 默认为 RUNNING 状态
 
