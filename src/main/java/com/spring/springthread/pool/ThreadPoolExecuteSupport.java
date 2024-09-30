@@ -135,7 +135,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     @SuppressWarnings("all")
     private final class Worker extends AbstractQueuedSynchronizer
             implements Runnable {
-        private static final long serialVersionUID = 6138294804551838833L;
+        private static final long serialVersionUID = 1L;
 
         final Thread thread;
         Runnable firstTask;
@@ -153,16 +153,26 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
 
         @Override
-        protected boolean tryRelease(int arg) {
-            return getState() == 0;
-        }
-
-        @Override
         protected boolean isHeldExclusively() {
             return getState() != 0;
         }
 
-        public boolean tryAcquire() {
+        public void unlock() {
+            release(1);
+        }
+
+        protected boolean tryRelease(int unused) {
+            setExclusiveOwnerThread(null);
+            setState(0);
+            return true;
+        }
+
+
+        public void lock() {
+            acquire(1);
+        }
+
+        protected boolean tryAcquire(int unused) {
             if (compareAndSetState(0, 1)) {
                 setExclusiveOwnerThread(Thread.currentThread());
                 return true;
@@ -170,21 +180,6 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             return false;
         }
 
-        public boolean tryRelease() {
-            if (compareAndSetState(1, 0)) {
-                setExclusiveOwnerThread(null);
-                return true;
-            }
-            return false;
-        }
-
-        public void lock() {
-            acquire(1);
-        }
-
-        public void unlock() {
-            release(1);
-        }
 
         public boolean isLocked() {
             return isHeldExclusively();
@@ -248,6 +243,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                     lock.unlock();
                 }
                 if (addWorker) {
+                    System.out.println("start thread " + waitAddThread.getName());
                     waitAddThread.start(); // 启动线程 启用VM底层的 SharedThreadContainer 来管理线程
                     workerStart = true;
                 }
@@ -273,11 +269,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         Thread currentThread = Thread.currentThread();
         Runnable task = worker.firstTask;
         worker.firstTask = null;
-        worker.unlock(); // 允许中断
-        boolean completedAbruptly = true; // 突然结束
+        worker.unlock(); // 允许添加新的task任务（第一次执行worker的run方法时 此代码的作用是将 state 置为 0 意思就是运行时 -1 是中断时）
+        boolean completedAbruptly = true; // 允许中断
         try {
             while (task != null || (task = getTask()) != null) {
-                worker.lock(); // 不允许中断
+                worker.lock(); // 不允许添加新的task任务
                 if ((ctl.get() >= STOP || Thread.interrupted() && ctl.get() >= STOP) && !currentThread.isInterrupted()) {
                     currentThread.interrupt();
                 }
