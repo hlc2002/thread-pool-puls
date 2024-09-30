@@ -176,6 +176,26 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     /**
+     * 监控工作线程数量
+     *
+     * @return 工作线程数量
+     */
+    @Override
+    public int getWorkerCount() {
+        return workers.size();
+    }
+
+    /**
+     * 监控待执行任务数量
+     *
+     * @return 待执行任务数量
+     */
+    @Override
+    public int getRunnableTaskCount() {
+        return runnableQueue.size();
+    }
+
+    /**
      * 中断所有工作线程
      */
     private void interruptWorkers() {

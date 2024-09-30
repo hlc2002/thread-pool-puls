@@ -20,6 +20,9 @@ public interface ExecuteSupport extends Execute, Runnable, AutoCloseable {
 
     boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
 
+    int getWorkerCount();
+
+    int getRunnableTaskCount();
     @Override
     default void close() {
 
