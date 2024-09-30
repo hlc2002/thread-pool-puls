@@ -106,6 +106,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     public void execute(Runnable command) {
         if (command == null)
             throw new NullPointerException("command is null !");
+        System.out.println("worker count : " + workerCountOf(ctl.get()) + ", core pool size : " + corePoolSize);
         if (workerCountOf(ctl.get()) < corePoolSize) {
             if (addWorker(command, true)) {
                 return;
