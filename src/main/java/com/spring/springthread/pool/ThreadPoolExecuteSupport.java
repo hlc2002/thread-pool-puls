@@ -268,19 +268,19 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     final void runWorker(Worker worker) {
         Thread currentThread = Thread.currentThread();
         Runnable task = worker.firstTask;
-        worker.firstTask = null;
-        worker.unlock(); // 允许添加新的task任务（第一次执行worker的run方法时 此代码的作用是将 state 置为 0 意思就是运行时 -1 是中断时）
+        worker.firstTask = null; // 当firstTask等于空时，说明该worker已经进入工作状态，不为空时是说明该worker刚创建完毕
+        worker.unlock(); // 允许添加新的task任务（第一次执行worker的run方法时 此代码的作用是将 state 置为 0 意思就是进入运行时 -1 是中断时）
         boolean completedAbruptly = true; // 允许中断
         try {
             while (task != null || (task = getTask()) != null) {
-                worker.lock(); // 不允许添加新的task任务
+                worker.lock(); // 不允许添加新的task任务 此时会将 state 置为 1 意思就是 阻塞中（有任务在执行）
                 if ((ctl.get() >= STOP || Thread.interrupted() && ctl.get() >= STOP) && !currentThread.isInterrupted()) {
                     currentThread.interrupt();
                 }
                 try {
                     beforeExecute(currentThread, task);
                     try {
-                        task.run();
+                        task.run(); // 执行 runnable 任务
                         afterExecute(task, null);
                     } catch (Exception e) {
                         afterExecute(task, e);
@@ -288,13 +288,13 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                     }
                 } finally {
                     task = null;
-                    worker.completedTasks++;
-                    worker.unlock();
+                    worker.completedTasks++; // 记录工作线程 已经完成的任务数量
+                    worker.unlock(); // 也允许添加新的task任务 将 state 置为 0
                 }
             }
-            completedAbruptly = false;
+            completedAbruptly = false; // 不允许中断
         } finally {
-            processWorkerExit(worker, completedAbruptly);
+            processWorkerExit(worker, completedAbruptly); // 释放工作线程的资源 意思就是退出此工作线程，在 runnableQueue中 已经拉取不到任务了
         }
     }
 
@@ -314,7 +314,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             }
 
             try {
-                // 工作线程数量已经大于核心线程数 或 允许线程超时 时 延时获取任务 否则直接获取runnable queue 中的头部任务
+                // 当工作线程数量已经大于核心线程数 或 允许线程超时 时 延时获取任务 否则直接获取runnable queue 中的头部任务
                 Runnable runnable = timed ? runnableQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : runnableQueue.take();
                 if (runnable != null)
                     return runnable;
