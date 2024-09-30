@@ -17,23 +17,23 @@ import java.util.concurrent.locks.ReentrantLock;
  * @version 1.0
  * @apiNote ThreadPoolExecuteSupport
  * @since 2024/9/14 16:18:38
- * <P>
- *     线程池化执行支持器
- *     特点：
- *          1、原子整数记录线程池状态 与 线程数量；
- *          2、worker作为工作线程主体不断向runnableQueue拉取任务执行，这个过程是并行的；
- *          3、默认提交任务时尝试直接向worker投递任务，如果失败则尝试向阻塞队列投递任务，投递失败则抛出异常；
- *          4、如果提交任务失败，则尝试向拒绝策略投递任务，如果失败则抛出异常；
- *          5、线程池主锁 保证线程安全，通过 CAS 保证线程池状态的修改；
- *          6、线程池状态的修改通过 CAS 保证原子性；
- *          7、worker 线程通过 CAS 获取锁，保证worker同时只执行一个任务；
- *     待优化：
- *          1、线程创建应当配置工厂类实现；
- *          2、统一管理线程状态的容器：底层使用并发容器 SharedThreadContainer 实现管理；
- *          3、部分功能接口的完善；
- *     使用方式：
- *          new ThreadPoolExecuteSupport(5, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>())
- *                         .execute(() -> System.out.println("hello world"));
+ * <p>
+ * 线程池化执行支持器
+ * 特点：
+ * 1、原子整数记录线程池状态 与 线程数量；
+ * 2、worker作为工作线程主体不断向runnableQueue拉取任务执行，这个过程是并行的；
+ * 3、默认提交任务时尝试直接向worker投递任务，如果失败则尝试向阻塞队列投递任务，投递失败则抛出异常；
+ * 4、如果提交任务失败，则尝试向拒绝策略投递任务，如果失败则抛出异常；
+ * 5、线程池主锁 保证线程安全，通过 CAS 保证线程池状态的修改；
+ * 6、线程池状态的修改通过 CAS 保证原子性；
+ * 7、worker 线程通过 CAS 获取锁，保证worker同时只执行一个任务；
+ * 待优化：
+ * 1、线程创建应当配置工厂类实现；
+ * 2、统一管理线程状态的容器：底层使用并发容器 SharedThreadContainer 实现管理；
+ * 3、部分功能接口的完善；
+ * 使用方式：
+ * new ThreadPoolExecuteSupport(5, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>())
+ * .execute(() -> System.out.println("hello world"));
  * </P>
  */
 public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
@@ -114,6 +114,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private volatile long keepAliveTime; // 任务保持活跃时间
 
     private final ReentrantLock mainLock = new ReentrantLock(); // 线程池可重入锁
+    private static final RuntimePermission shutdownPerm = new RuntimePermission("modifyThread"); // 线程池权限
 
     @Override
     public void run() {
@@ -151,6 +152,69 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
      */
     final void tryTerminate() {
 
+    }
+
+    /**
+     * 关闭线程池
+     */
+    public void shutdown() {
+        final ReentrantLock lock = this.mainLock;
+        lock.lock();
+        try {
+            checkPermission(); // 检查权限
+            for (; ; ) {
+                // 循环判断线程池状态 并尝试修改状态 直到 线程池状态为 SHUTDOWN 或者修改状态为 SHUTDOWN 成功
+                if (ctl.get() >= SHUTDOWN || ctl.compareAndSet(ctl.get(), ctlOf(SHUTDOWN, workerCountOf(ctl.get()))))
+                    break;
+            }
+            interruptWorkers(); // 中断所有工作线程
+            onShutdown(); // 钩子函数 在线程池关闭时执行某些操作
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 中断所有工作线程
+     */
+    private void interruptWorkers() {
+        final ReentrantLock lock = this.mainLock; // 重入锁
+        lock.lock();
+        try {
+            for (Worker worker : workers) {
+                try {
+                    Thread thread = worker.thread;
+                    // 线程未中断 且 尝试获取阻塞其他任务成功
+                    if (!thread.isInterrupted() && worker.tryAcquire(1)) {
+                        thread.interrupt(); // 中断线程
+                    }
+                } finally {
+                    worker.unlock();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 检查权限
+     */
+    private void checkPermission() {
+        SecurityManager securityManager = System.getSecurityManager();
+        if (securityManager != null) {
+            securityManager.checkPermission(shutdownPerm);
+            for (Worker worker : workers) {
+                // 检查线程权限 允许修改 线程
+                securityManager.checkAccess(worker.thread);
+            }
+        }
+    }
+
+    /**
+     * 钩子函数 在线程池关闭时执行某些操作
+     */
+    void onShutdown() {
     }
 
     /**
