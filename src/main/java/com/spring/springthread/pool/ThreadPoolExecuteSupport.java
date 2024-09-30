@@ -114,7 +114,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private volatile long keepAliveTime; // 任务保持活跃时间
 
     private final ReentrantLock mainLock = new ReentrantLock(); // 线程池可重入锁
-    private static final RuntimePermission shutdownPerm = new RuntimePermission("modifyThread"); // 线程池权限
+    private static final RuntimePermission SHUTDOWN_PER = new RuntimePermission("modifyThread"); // 线程池权限
 
     @Override
     public void run() {
@@ -157,6 +157,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     /**
      * 关闭线程池
      */
+    @Override
     public void shutdown() {
         final ReentrantLock lock = this.mainLock;
         lock.lock();
@@ -200,10 +201,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     /**
      * 检查权限
      */
+    @SuppressWarnings("all")
     private void checkPermission() {
         SecurityManager securityManager = System.getSecurityManager();
         if (securityManager != null) {
-            securityManager.checkPermission(shutdownPerm);
+            securityManager.checkPermission(SHUTDOWN_PER);
             for (Worker worker : workers) {
                 // 检查线程权限 允许修改 线程
                 securityManager.checkAccess(worker.thread);
