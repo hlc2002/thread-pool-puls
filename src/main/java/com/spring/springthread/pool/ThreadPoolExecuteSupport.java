@@ -536,5 +536,6 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         threadPoolExecuteSupport.execute(() -> {
             System.out.println("hello world ! " + 5);
         });
+        threadPoolExecuteSupport.shutdown();
     }
 }
