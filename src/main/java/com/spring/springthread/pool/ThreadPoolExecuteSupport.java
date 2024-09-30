@@ -48,7 +48,6 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     // 111 运行 000 关闭 001 停止 010 整理 011 销毁
     /**
      * 1110 0000 0000 0000   0000 0000 0000 0000
-     * 0000 0000 0000 0000   0000 0000 0000 0011
      */
     private static final int RUNNING = -1 << COUNT_BITS;
     /**
