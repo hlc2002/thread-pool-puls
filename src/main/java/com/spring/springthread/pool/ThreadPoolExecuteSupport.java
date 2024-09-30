@@ -14,9 +14,27 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author spring
- * @since 2024/9/14 16:18:38
- * @apiNote
  * @version 1.0
+ * @apiNote ThreadPoolExecuteSupport
+ * @since 2024/9/14 16:18:38
+ * <P>
+ *     线程池化执行支持器
+ *     特点：
+ *          1、原子整数记录线程池状态 与 线程数量；
+ *          2、worker作为工作线程主体不断向runnableQueue拉取任务执行，这个过程是并行的；
+ *          3、默认提交任务时尝试直接向worker投递任务，如果失败则尝试向阻塞队列投递任务，投递失败则抛出异常；
+ *          4、如果提交任务失败，则尝试向拒绝策略投递任务，如果失败则抛出异常；
+ *          5、线程池主锁 保证线程安全，通过 CAS 保证线程池状态的修改；
+ *          6、线程池状态的修改通过 CAS 保证原子性；
+ *          7、worker 线程通过 CAS 获取锁，保证worker同时只执行一个任务；
+ *     待优化：
+ *          1、线程创建应当配置工厂类实现；
+ *          2、统一管理线程状态的容器：底层使用并发容器 SharedThreadContainer 实现管理；
+ *          3、部分功能接口的完善；
+ *     使用方式：
+ *          new ThreadPoolExecuteSupport(5, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>())
+ *                         .execute(() -> System.out.println("hello world"));
+ * </P>
  */
 public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     /**
@@ -79,29 +97,34 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         return rs | wc;
     }
 
-    private final HashSet<Worker> workers = new HashSet<>();
-    private BlockingQueue<Runnable> runnableQueue;
+    private final HashSet<Worker> workers = new HashSet<>(); // 线程池工作线程集合
+    private BlockingQueue<Runnable> runnableQueue; // 任务队列
 
-    private volatile RejectedHandler handler;
+    private volatile RejectedHandler handler; // 拒绝策略
 
     final void rejected(Runnable command) {
         handler.rejected(command, this);
     }
 
-    private volatile int corePoolSize;
-    private volatile int maximumPoolSize;
-    private volatile int largestPoolSize;
+    private volatile int corePoolSize; // 线程池核心线程数量
+    private volatile int maximumPoolSize; // 线程池最大线程数量 不含阻塞队列
+    private volatile int largestPoolSize; // 线程池最大线程数量 含阻塞队列
 
-    private volatile boolean allowCoreThreadTimeOut;
-    private volatile long keepAliveTime;
+    private volatile boolean allowCoreThreadTimeOut; // 是否允许核心任务超时
+    private volatile long keepAliveTime; // 任务保持活跃时间
 
-    private final ReentrantLock mainLock = new ReentrantLock();
+    private final ReentrantLock mainLock = new ReentrantLock(); // 线程池可重入锁
 
     @Override
     public void run() {
 
     }
 
+    /**
+     * 执行任务
+     *
+     * @param command 任务
+     */
     @Override
     public void execute(Runnable command) {
         if (command == null)
@@ -123,6 +146,9 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
     }
 
+    /**
+     * 尝试销毁线程池
+     */
     final void tryTerminate() {
 
     }
@@ -142,7 +168,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         volatile long completedTasks;
 
         Worker(Runnable firstTask) {
-            setState(-1); // 初始化中断态 -1 当此值修改为 0 意味着线程运行
+            setState(-1); // 初始化中断态 -1 当此值修改为 0 意味着其他任务可交给工作线程允许
             this.firstTask = firstTask;
             thread = new Thread(this);
         }
@@ -157,21 +183,39 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             return getState() != 0;
         }
 
+        /**
+         * 允许其他任务运行
+         */
         public void unlock() {
             release(1);
         }
 
+        /**
+         * 其他任务可运行
+         *
+         * @param unused 重写标识
+         * @return 是否成功
+         */
         protected boolean tryRelease(int unused) {
             setExclusiveOwnerThread(null);
             setState(0);
             return true;
         }
 
-
+        /**
+         * 阻塞其他任务
+         */
         public void lock() {
             acquire(1);
         }
 
+        /**
+         * 尝试将其他任务可进入运行态 改为 其他任务阻塞态
+         * 这里需要重写 tryAcquire 方法
+         *
+         * @param unused 重写标识
+         * @return 是否成功
+         */
         protected boolean tryAcquire(int unused) {
             if (compareAndSetState(0, 1)) {
                 setExclusiveOwnerThread(Thread.currentThread());
@@ -180,11 +224,18 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             return false;
         }
 
-
+        /**
+         * 其他任务是否处在阻塞态（已经有任务在执行，其他任务阻塞）
+         *
+         * @return
+         */
         public boolean isLocked() {
             return isHeldExclusively();
         }
 
+        /**
+         * 中断
+         */
         void interruptIfStarted() {
             Thread t;
             if (getState() >= 0 && (t = thread) != null && !t.isInterrupted()) {
@@ -198,6 +249,13 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
 
     }
 
+    /**
+     * 添加 worker
+     *
+     * @param firstTask 初始任务
+     * @param core      是否核心线程 不是核心线程 就根据最大线程数来判断 添加
+     * @return boolean 是否添加成功
+     */
     private boolean addWorker(Runnable firstTask, boolean core) {
         loop:
         for (int state = ctl.get(); ; ) {
@@ -265,6 +323,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         return workerStart;
     }
 
+    /**
+     * 工作线程的启动方法
+     *
+     * @param worker 新生的工作线程对象
+     */
     final void runWorker(Worker worker) {
         Thread currentThread = Thread.currentThread();
         Runnable task = worker.firstTask;
@@ -298,6 +361,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
     }
 
+    /**
+     * 工作线程拉取任务队列并执行的方法
+     *
+     * @return 任务对象
+     */
     private Runnable getTask() {
         boolean timedOut = false; // 不允许超时
         for (; ; ) {
@@ -325,18 +393,42 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         }
     }
 
+    /**
+     * 工作线程执行任务前的钩子方法
+     *
+     * @param thread 工作线程对象
+     * @param task   要执行的任务对象
+     */
     protected void beforeExecute(Thread thread, Runnable task) {
 
     }
 
+    /**
+     * 工作线程执行任务后的钩子方法
+     *
+     * @param runnable  执行的任务对象
+     * @param throwable 执行过程中抛出的异常
+     */
     protected void afterExecute(Runnable runnable, Throwable throwable) {
 
     }
 
+    /**
+     * 工作线程退出时的钩子方法
+     *
+     * @param worker            工作线程对象
+     * @param completedAbruptly 是否是突然异常退出
+     */
     private void processWorkerExit(Worker worker, boolean completedAbruptly) {
 
     }
 
+    /**
+     * 移除任务
+     *
+     * @param runnable 任务对象
+     * @return boolean 是否移除成功
+     */
     public boolean remove(Runnable runnable) {
         boolean remove = runnableQueue.remove(runnable);
         tryTerminate();
