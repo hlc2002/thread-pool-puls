@@ -1,8 +1,8 @@
 package com.spring.springthread.pool;
 
 import com.spring.springthread.executor.AbstractExecuteSupport;
-import com.spring.springthread.executor.DefaultRejectedHandler;
-import com.spring.springthread.executor.RejectedHandler;
+import com.spring.springthread.reject.DefaultRejectedHandler;
+import com.spring.springthread.reject.RejectedHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
