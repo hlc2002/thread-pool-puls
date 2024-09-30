@@ -110,7 +110,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     private volatile int maximumPoolSize; // 线程池最大线程数量 不含阻塞队列
     private volatile int largestPoolSize; // 线程池最大线程数量 含阻塞队列
 
-    private volatile boolean allowCoreThreadTimeOut; // 是否允许核心任务超时
+    private volatile boolean allowCoreThreadTimeOut = true; // 是否允许核心任务超时
     private volatile long keepAliveTime; // 任务保持活跃时间
 
     private final ReentrantLock mainLock = new ReentrantLock(); // 线程池可重入锁
@@ -128,8 +128,9 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
      */
     @Override
     public void execute(Runnable command) {
-        if (command == null)
+        if (command == null) {
             throw new NullPointerException("command is null !");
+        }
         System.out.println("worker count : " + workerCountOf(ctl.get()) + ", core pool size : " + corePoolSize);
         if (workerCountOf(ctl.get()) < corePoolSize) {
             if (addWorker(command, true)) {
@@ -165,8 +166,9 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             checkPermission(); // 检查权限
             for (; ; ) {
                 // 循环判断线程池状态 并尝试修改状态 直到 线程池状态为 SHUTDOWN 或者修改状态为 SHUTDOWN 成功
-                if (ctl.get() >= SHUTDOWN || ctl.compareAndSet(ctl.get(), ctlOf(SHUTDOWN, workerCountOf(ctl.get()))))
+                if (ctl.get() >= SHUTDOWN || ctl.compareAndSet(ctl.get(), ctlOf(SHUTDOWN, workerCountOf(ctl.get())))) {
                     break;
+                }
             }
             interruptWorkers(); // 中断所有工作线程
             onShutdown(); // 钩子函数 在线程池关闭时执行某些操作
@@ -346,17 +348,23 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         loop:
         for (int state = ctl.get(); ; ) {
             if (state >= STOP) // 线程池已停止 直接拒绝添加核心 worker
+            {
                 return false;
+            }
             while (true) {
                 // 核心或非核心线程数 过载，即拒绝直接添加 worker （这里是先插队的思路）
                 if (workerCountOf(state) >= ((core ? corePoolSize : maximumPoolSize) & COUNT_MASK)) {
                     return false;
                 }
                 if (compareAndIncrementWorkerCount(state)) // 核心线程数增加成功 插队成功 跳出大循环体（比较与交换的思维）
+                {
                     break loop;
+                }
                 state = ctl.get(); // 添加失败继续自旋重试 直到成功
                 if (state >= SHUTDOWN) // 线程池已停止，重新进入大循环体
+                {
                     continue loop;
+                }
                 // 如果线程池未停止，该工作线程 自旋 的被添加进原子整数中。
             }
         }
@@ -374,15 +382,17 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                 lock.lock(); // 按住线程池内的共享可重入锁 按不住的阻塞
                 try {
                     int state = ctl.get();
-                    if (state >= RUNNING || (state >= STOP && firstTask == null)) {
-                        if (waitAddThread.getState() != Thread.State.NEW)
+                    if (state >= RUNNING) {
+                        if (waitAddThread.getState() != Thread.State.NEW) {
                             throw new IllegalThreadStateException("线程状态异常：待运行的线程状态不是 新建！");
+                        }
                     }
                     workers.add(worker);
                     addWorker = true;
                     int size = workers.size();
-                    if (size > largestPoolSize)
+                    if (size > largestPoolSize) {
                         largestPoolSize = size;
+                    }
                 } finally {
                     lock.unlock();
                 }
@@ -397,8 +407,9 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                 final ReentrantLock mainLock = this.mainLock;
                 mainLock.lock();
                 try {
-                    if (worker != null)
+                    if (worker != null) {
                         workers.remove(worker);
+                    }
                     decrementWorkerCount(); // 释放线程池内的资源
                     tryTerminate(); // 尝试终止线程池
                 } finally {
@@ -462,16 +473,18 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
             int workerCount = workerCountOf(ctl.get());
             boolean timed = allowCoreThreadTimeOut || workerCount > corePoolSize;
             if ((workerCount > maximumPoolSize || (timedOut && allowCoreThreadTimeOut)) && (workerCount > 1 || runnableQueue.isEmpty())) {
-                if (compareAndDecrementWorkerCount(ctl.get()))
+                if (compareAndDecrementWorkerCount(ctl.get())) {
                     return null;
+                }
                 continue;
             }
 
             try {
                 // 当工作线程数量已经大于核心线程数 或 允许线程超时 时 延时获取任务 否则直接获取runnable queue 中的头部任务
                 Runnable runnable = timed ? runnableQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : runnableQueue.take();
-                if (runnable != null)
+                if (runnable != null) {
                     return runnable;
+                }
                 timedOut = true;
             } catch (InterruptedException e) {
                 timedOut = false;
