@@ -542,7 +542,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
 
     public static void main0() {
         ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 3, 10,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+                TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(100));
         CountDownLatch countDownLatch = new CountDownLatch(2);
         threadPoolExecuteSupport.execute(() -> {
             try {
