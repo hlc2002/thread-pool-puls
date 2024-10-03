@@ -5,15 +5,16 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.concurrent.DefaultManagedAwareThreadFactory;
 
 import java.util.concurrent.*;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
 public class SpringThreadApplication {
-    final void run() {
-        while (true) {
-            System.out.println("hello world");
-        }
+    public static void main(String[] args) {
+        SpringThreadApplication application = new SpringThreadApplication();
+        application.main0();
+        application.main1();
     }
 
-    public static void main(String[] args) {
+    public void main0() {
         // 模拟worker
         Worker worker = new Worker(() -> System.out.println("hello word !"));
         Thread thread = worker.thread;
@@ -31,13 +32,37 @@ public class SpringThreadApplication {
         }
     }
 
-    public static class Worker {
+    public void main1(){
+        Worker worker = new Worker(() -> System.out.println("hello word !"));
+    }
+
+    public final class Worker extends AbstractQueuedSynchronizer {
         Runnable firstTask;
         Thread thread;
 
         Worker(Runnable firstTask) {
             this.firstTask = firstTask;
             this.thread = new Thread(firstTask);
+        }
+        public void lock() {
+            acquire(0);
+        }
+        @Override
+        public boolean tryAcquire(int ued) {
+            if (compareAndSetState(0,1)){
+                setExclusiveOwnerThread(Thread.currentThread());
+                return true;
+            }
+            return false;
+        }
+        public void unlock() {
+            release(1);
+        }
+        @Override
+        protected boolean tryRelease(int unused) {
+            setExclusiveOwnerThread(null);
+            setState(0);
+            return true;
         }
     }
 }
