@@ -1,4 +1,4 @@
-package com.spring.springthread.lock;
+package com.spring.springthread.framework;
 
 /**
  * @author spring

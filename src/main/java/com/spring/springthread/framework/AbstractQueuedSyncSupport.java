@@ -1,4 +1,4 @@
-package com.spring.springthread.lock;
+package com.spring.springthread.framework;
 
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -10,7 +10,7 @@ import java.util.concurrent.locks.LockSupport;
  * @apiNote
  * @since 2024/10/3 16:06:39
  */
-public abstract class AbstractQueuedSynchronizer extends AbstractOwnedSynchronizer {
+public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronizer {
     private volatile int state;
     private volatile QueueNode head;
     private volatile QueueNode tail;
@@ -29,7 +29,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnedSynchroniz
 
     // CAS 更改state的值
     protected final boolean compareAndSetState(int expect, int update) {
-        AtomicReferenceFieldUpdater<AbstractQueuedSynchronizer, Integer> stateAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSynchronizer.class, Integer.class, "state");
+        AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, Integer> stateAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, Integer.class, "state");
         return stateAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
