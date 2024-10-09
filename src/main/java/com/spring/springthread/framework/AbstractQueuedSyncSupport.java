@@ -1,6 +1,7 @@
 package com.spring.springthread.framework;
 
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.concurrent.locks.LockSupport;
 
@@ -33,18 +34,21 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         return stateAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
+    // CAS 更改尾节点
     @SuppressWarnings("all")
     protected final boolean casTail(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "tail");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
+    // CAS 更改头节点
     @SuppressWarnings("all")
     protected final boolean casHead(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "head");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
+    // 初始化头节点（仅当队列为空时初始化空节点，否则直接返回尾节点）
     private QueueNode tryInitQueueHeadNode() {
         for (QueueNode h = null, t; ; ) {
             if ((t = tail) != null) {
@@ -69,6 +73,127 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         }
     }
 
+    // 新节点入队
+    final void enqueue(QueueNode node) {
+        if (node != null && node.waiter != null) {
+            boolean unpark = false;
+            for (QueueNode t; ; ) {
+                // 如果队列为空 且 初始化节点仍然为空，说明堆空间不足，直接唤醒线程
+                if ((t = tail) == null && (t = tryInitQueueHeadNode()) == null) {
+                    unpark = true;
+                    break;
+                }
+                // 将当前节点挂载在原先尾节点的后面，如果原先的尾部节点状态小于0，则唤醒它的线程
+                node.setPrevRelaxed(t);
+                if (casTail(t, node)) {
+                    t.next = node;
+                    if (t.status < 0) {
+                        unpark = true;
+                    }
+                    break;
+                }
+            }
+            if (unpark) {
+                LockSupport.unpark(node.waiter);
+            }
+        }
+    }
+
+    // 判断节点是否在队列中
+    final boolean isEnqueued(QueueNode node) {
+        for (QueueNode t = tail; t != null; t = t.prev) {
+            if (t == node) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 唤醒下一个节点
+     * @param node 节点
+     */
+    private static void signalNextQueueNode(QueueNode node) {
+        if (node != null && node.next != null && node.next.status != 0) {
+            node.next.getAndReSetStatus(WAITING);
+            LockSupport.unpark(node.next.waiter);
+        }
+    }
+
+    /**
+     * 唤醒下一个共享节点
+     * @param node 节点
+     */
+    private static void signalNextQueueNodeWhenShared(QueueNode node) {
+        if (node != null && node.next != null && node.next instanceof SharedNode && node.next.status != 0) {
+            node.next.getAndReSetStatus(WAITING);
+            LockSupport.unpark(node.next.waiter);
+        }
+    }
+
+    /**
+     * 获取锁
+     * @param node 节点
+     * @param arg arg参数是修改的状态值 一般传递 1 ，当条件节点使用时可能会传递大于1的值用来控制条件
+     * @param shared 是否是共享锁
+     * @param interruptible 是否可以响应中断
+     * @param timed 是否控制自旋时间
+     * @param timeout 自旋时间
+     * @return 锁的状态
+     */
+    @SuppressWarnings("all")
+    final int acquire(QueueNode node, int arg, boolean shared, boolean interruptible, boolean timed, Long timeout) {
+        Thread currentThread = Thread.currentThread();
+        byte spin = 0, postSpins = 0;
+        boolean interrupted = false, first = false;
+        // 节点前驱
+        QueueNode pred = null;
+        while (true) {
+            if (!first && (pred = node == null ? null : node.prev) != null && !(first = head == pred)) {
+                if (pred.status < 0) {
+                    // todo 前驱的状态异常，取消队列中异常的节点
+                    continue;
+                } else if (pred.prev == null) {
+                    // 前驱节点等待被唤醒执行，则自旋等待
+                    Thread.onSpinWait();
+                    continue;
+                }
+            }
+            // 节点前驱为空，则说明当前节点为头节点，则直接尝试占有锁
+            if (first || pred == null) {
+                boolean locked = false;
+                try {
+                    if (shared) {
+                        // todo 共享锁的实现
+                    } else {
+                        locked = tryAcquire(arg);
+                    }
+                } catch (Throwable e) {
+                    // todo 取消获取锁的动作
+                    throw e;
+                }
+                if (locked) {
+                    if(first){
+                        node.prev = null;
+                        pred.next = null;
+                        head = node;
+                        node.waiter = null;
+                        if (shared){
+                            signalNextQueueNodeWhenShared(node);
+                        }
+                        if(interrupted){
+                            currentThread.isInterrupted();
+                        }
+                    }
+                    return 1;
+                }
+            }
+        }
+    }
+
+    protected boolean tryAcquire(int arg) {
+        throw new UnsupportedOperationException();
+    }
 
     static class QueueNode {
         volatile QueueNode next;
@@ -103,6 +228,12 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
 
         final void clearStatus() {
             this.status = 0;
+        }
+
+        final void getAndReSetStatus(int s) {
+            AtomicIntegerFieldUpdater<QueueNode> integerFieldUpdater = AtomicIntegerFieldUpdater.newUpdater(QueueNode.class, "status");
+            // 按位取反再与当前的状态进行与操作
+            integerFieldUpdater.getAndSet(this, status & (~s));
         }
     }
 
