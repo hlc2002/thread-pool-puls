@@ -33,6 +33,42 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         return stateAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
+    @SuppressWarnings("all")
+    protected final boolean casTail(QueueNode expect, QueueNode update) {
+        AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "tail");
+        return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
+    }
+
+    @SuppressWarnings("all")
+    protected final boolean casHead(QueueNode expect, QueueNode update) {
+        AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "head");
+        return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
+    }
+
+    private QueueNode tryInitQueueHeadNode() {
+        for (QueueNode h = null, t; ; ) {
+            if ((t = tail) != null) {
+                return t;
+            } else if (head != null) {
+                // 尾等于null，头不等于null，线程自旋等待（意味着有节点在尝试占有锁）
+                Thread.onSpinWait();
+            } else {
+                if (h == null) {
+                    try {
+                        h = new NoSharedNode();
+                    } catch (OutOfMemoryError error) {
+                        return null;
+                    }
+                }
+                // CAS 设置头节点 使用在循环中是为了保证自旋的设置成功，失败了则是多线程数据变化需要重试逻辑
+                if (casHead(null, h)) {
+                    // 设置尾节点
+                    return tail = h;
+                }
+            }
+        }
+    }
+
 
     static class QueueNode {
         volatile QueueNode next;
@@ -42,9 +78,11 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
 
         public QueueNode() {
         }
-        public QueueNode(int status){
+
+        public QueueNode(int status) {
             this.status = status;
         }
+
         final boolean casNext(QueueNode expect, QueueNode update) {
             AtomicReferenceFieldUpdater<QueueNode, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(QueueNode.class, QueueNode.class, "next");
             return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
@@ -99,9 +137,9 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
     public static void main(String[] args) {
         QueueNode node = new QueueNode();
         node.setPrevRelaxed(new QueueNode(1));
-        System.out.println(node.prev.status+"");
+        System.out.println(node.prev.status + "");
         // 测试修改效果
         node.casPrev(node.prev, new QueueNode(2));
-        System.out.println(node.prev.status+"");
+        System.out.println(node.prev.status + "");
     }
 }
