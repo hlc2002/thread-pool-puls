@@ -42,7 +42,9 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnedSynchroniz
 
         public QueueNode() {
         }
-
+        public QueueNode(int status){
+            this.status = status;
+        }
         final boolean casNext(QueueNode expect, QueueNode update) {
             AtomicReferenceFieldUpdater<QueueNode, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(QueueNode.class, QueueNode.class, "next");
             return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
@@ -92,5 +94,14 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnedSynchroniz
         public boolean isReleasable() {
             return status <= 1 || Thread.currentThread().isInterrupted();
         }
+    }
+
+    public static void main(String[] args) {
+        QueueNode node = new QueueNode();
+        node.setPrevRelaxed(new QueueNode(1));
+        System.out.println(node.prev.status+"");
+        // 测试修改效果
+        node.casPrev(node.prev, new QueueNode(2));
+        System.out.println(node.prev.status+"");
     }
 }
