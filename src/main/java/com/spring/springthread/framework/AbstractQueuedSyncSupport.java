@@ -195,11 +195,12 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                 }
             }
             // 节点前驱为空，则说明当前节点为头节点，尝试占有锁 或者 node 为空，先尝试插队获取锁，否则排队阻塞
-            Integer updated = tryOccupyAndUpdateState(node, arg, shared, first, pred, interrupted, currentThread);
-            if (updated != null) {
-                return updated;
+            if (first || pred == null) {
+                Integer updated = tryOccupyAndUpdateState(node, arg, shared, first, pred, interrupted, currentThread);
+                if (updated != null) {
+                    return updated;
+                }
             }
-
             QueueNode t;
             if ((t = tail) == null) { // 队列为空，则初始化队列头节点
                 tryInitalizeQueue(arg, shared);
@@ -291,33 +292,31 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      * @return 获取锁的结果 0：获取锁失败，1：获取锁成功，null：不满足条件，跳过尝试获取锁的操作
      */
     private Integer tryOccupyAndUpdateState(QueueNode node, int arg, boolean shared, boolean first, QueueNode pred, boolean interrupted, Thread currentThread) {
-        if (first || pred == null) {
-            boolean locked = false;
-            try {
+        boolean locked = false;
+        try {
+            if (shared) {
+                // todo 共享锁的实现
+            } else {
+                locked = tryAcquire(arg);
+            }
+        } catch (Throwable e) {
+            // todo 取消获取锁的动作
+            throw e;
+        }
+        if (locked) {
+            if (first) { // 获取锁成功，如果是队头有效节点就解除该节点（队头是null的空节点，它的下一个节点才是有效的排队线程节点）
+                node.prev = null;
+                pred.next = null;
+                head = node;
+                node.waiter = null;
                 if (shared) {
-                    // todo 共享锁的实现
-                } else {
-                    locked = tryAcquire(arg);
+                    signalNextQueueNodeWhenShared(node);
                 }
-            } catch (Throwable e) {
-                // todo 取消获取锁的动作
-                throw e;
-            }
-            if (locked) {
-                if (first) { // 获取锁成功，如果是队头有效节点就解除该节点（队头是null的空节点，它的下一个节点才是有效的排队线程节点）
-                    node.prev = null;
-                    pred.next = null;
-                    head = node;
-                    node.waiter = null;
-                    if (shared) {
-                        signalNextQueueNodeWhenShared(node);
-                    }
-                    if (interrupted) {
-                        currentThread.isInterrupted();
-                    }
+                if (interrupted) {
+                    currentThread.isInterrupted();
                 }
-                return 1;
             }
+            return 1;
         }
         return null;
     }
