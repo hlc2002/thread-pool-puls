@@ -12,8 +12,17 @@ import java.util.concurrent.locks.LockSupport;
  * @since 2024/10/3 16:06:39
  */
 public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronizer {
+    /**
+     * 同步状态
+     */
     private volatile int state;
+    /**
+     * 队列头节点
+     */
     private volatile QueueNode head;
+    /**
+     * 队列尾节点
+     */
     private volatile QueueNode tail;
 
     static final int WAITING = 1;
@@ -23,32 +32,51 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
     protected final int getState() {
         return state;
     }
-
     protected final void setState(int newState) {
         state = newState;
     }
 
-    // CAS 更改state的值
+    /**
+     * 原子更新同步状态
+     *
+     * @param expect 预期的状态值
+     * @param update 待更新的新状态值
+     * @return 如果状态值成功更新，则返回true；否则返回false
+     */
     protected final boolean compareAndSetState(int expect, int update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, Integer> stateAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, Integer.class, "state");
         return stateAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
-    // CAS 更改尾节点
+    /**
+     * CAS 更改尾节点
+     * @param expect 预期节点
+     * @param update 更新节点
+     * @return 如果更新成功，则返回true；否则返回false
+     */
     @SuppressWarnings("all")
     protected final boolean casTail(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "tail");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
-    // CAS 更改头节点
+    /**
+     * CAS 更改头节点
+     * @param expect 预期节点
+     * @param update 更新节点
+     * @return 如果更新成功，则返回true；否则返回false
+     */
     @SuppressWarnings("all")
     protected final boolean casHead(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "head");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
     }
 
-    // 初始化头节点（仅当队列为空时初始化空节点，否则直接返回尾节点）
+
+    /**
+     * 初始化头节点，如果头节点为空，则初始化一个空节点，否则返回尾节点
+     * @return 尾节点
+     */
     private QueueNode tryInitQueueHeadNode() {
         for (QueueNode h = null, t; ; ) {
             if ((t = tail) != null) {
@@ -73,7 +101,10 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         }
     }
 
-    // 新节点入队
+    /**
+     * 入队
+     * @param node 节点
+     */
     final void enqueue(QueueNode node) {
         if (node != null && node.waiter != null) {
             boolean unpark = false;
@@ -99,7 +130,11 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         }
     }
 
-    // 判断节点是否在队列中
+    /**
+     * 判断节点是否在队列中
+     * @param node 节点
+     * @return true：在队列中；false：不在队列中
+     */
     final boolean isEnqueued(QueueNode node) {
         for (QueueNode t = tail; t != null; t = t.prev) {
             if (t == node) {
@@ -173,15 +208,15 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                     throw e;
                 }
                 if (locked) {
-                    if(first){
+                    if (first) {
                         node.prev = null;
                         pred.next = null;
                         head = node;
                         node.waiter = null;
-                        if (shared){
+                        if (shared) {
                             signalNextQueueNodeWhenShared(node);
                         }
-                        if(interrupted){
+                        if (interrupted) {
                             currentThread.isInterrupted();
                         }
                     }
@@ -191,6 +226,11 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         }
     }
 
+    /**
+     * 尝试占有锁
+     * @param arg arg参数是修改的状态值 一般传递 1 ，当条件节点使用时可能会传递大于1的值用来控制条件
+     * @return 是否占有锁
+     */
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -208,28 +248,55 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
             this.status = status;
         }
 
+        /**
+         * cas设置next节点
+         * @param expect 期待值
+         * @param update 更新值
+         * @return 是否设置成功
+         */
         final boolean casNext(QueueNode expect, QueueNode update) {
             AtomicReferenceFieldUpdater<QueueNode, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(QueueNode.class, QueueNode.class, "next");
             return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
         }
 
+        /**
+         * cas设置prev节点
+         * @param expect 期待值
+         * @param update 更新值
+         * @return 是否设置成功
+         */
         final boolean casPrev(QueueNode expect, QueueNode update) {
             AtomicReferenceFieldUpdater<QueueNode, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(QueueNode.class, QueueNode.class, "prev");
             return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
         }
 
+        /**
+         * 设置prev节点，不保证原子性
+         * @param p 节点
+         */
         final void setPrevRelaxed(QueueNode p) {
             this.prev = p;
         }
 
+        /**
+         * 设置状态，不保证原子性
+         * @param s 状态值
+         */
         final void setStatusRelaxed(int s) {
             this.status = s;
         }
 
+        /**
+         * 清除状态
+         */
         final void clearStatus() {
             this.status = 0;
         }
 
+        /**
+         * 获取并设置状态
+         * @param s 状态值
+         */
         final void getAndReSetStatus(int s) {
             AtomicIntegerFieldUpdater<QueueNode> integerFieldUpdater = AtomicIntegerFieldUpdater.newUpdater(QueueNode.class, "status");
             // 按位取反再与当前的状态进行与操作
@@ -249,6 +316,11 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
     static final class ConditionNode extends QueueNode implements ForkJoinPool.ManagedBlocker {
         ConditionNode nextWaiter;
 
+        /**
+         * 阻塞当前线程，直到被唤醒
+         * @return 是否被唤醒
+         * @throws InterruptedException 线程被中断
+         */
         @Override
         public boolean block() throws InterruptedException {
             // 状态大于1且线程没有被中断
@@ -259,6 +331,10 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
             return true;
         }
 
+        /**
+         * 是否被释放
+         * @return 是否被释放
+         */
         @Override
         public boolean isReleasable() {
             return status <= 1 || Thread.currentThread().isInterrupted();
