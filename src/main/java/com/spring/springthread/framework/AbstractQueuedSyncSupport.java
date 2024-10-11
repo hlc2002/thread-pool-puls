@@ -11,6 +11,7 @@ import java.util.concurrent.locks.LockSupport;
  * @apiNote
  * @since 2024/10/3 16:06:39
  */
+@SuppressWarnings("all")
 public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronizer {
     /**
      * 同步状态
@@ -32,6 +33,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
     protected final int getState() {
         return state;
     }
+
     protected final void setState(int newState) {
         state = newState;
     }
@@ -54,7 +56,6 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      * @param update 更新节点
      * @return 如果更新成功，则返回true；否则返回false
      */
-    @SuppressWarnings("all")
     protected final boolean casTail(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "tail");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
@@ -66,7 +67,6 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      * @param update 更新节点
      * @return 如果更新成功，则返回true；否则返回false
      */
-    @SuppressWarnings("all")
     protected final boolean casHead(QueueNode expect, QueueNode update) {
         AtomicReferenceFieldUpdater<AbstractQueuedSyncSupport, QueueNode> nodeAtomicReferenceFieldUpdater = AtomicReferenceFieldUpdater.newUpdater(AbstractQueuedSyncSupport.class, QueueNode.class, "head");
         return nodeAtomicReferenceFieldUpdater.compareAndSet(this, expect, update);
@@ -136,6 +136,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      * @return true：在队列中；false：不在队列中
      */
     final boolean isEnqueued(QueueNode node) {
+        // question：为什么从尾部开始遍历？
         for (QueueNode t = tail; t != null; t = t.prev) {
             if (t == node) {
                 return true;
@@ -176,7 +177,6 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      * @param timeout 自旋时间
      * @return 锁的状态
      */
-    @SuppressWarnings("all")
     final int acquire(QueueNode node, int arg, boolean shared, boolean interruptible, boolean timed, Long timeout) {
         Thread currentThread = Thread.currentThread();
         byte spin = 0, postSpins = 0;
@@ -194,7 +194,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                     continue;
                 }
             }
-            // 节点前驱为空，则说明当前节点为头节点，则直接尝试占有锁
+            // 节点前驱为空，则说明当前节点为头节点，尝试占有锁 或者 node 为空，先尝试插队获取锁，否则排队阻塞
             if (first || pred == null) {
                 boolean locked = false;
                 try {
@@ -223,6 +223,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                     return 1;
                 }
             }
+            QueueNode t;
         }
     }
 
