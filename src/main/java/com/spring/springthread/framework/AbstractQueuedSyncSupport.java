@@ -1,10 +1,8 @@
 package com.spring.springthread.framework;
 
-import java.util.Queue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -197,58 +195,18 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                 }
             }
             // 节点前驱为空，则说明当前节点为头节点，尝试占有锁 或者 node 为空，先尝试插队获取锁，否则排队阻塞
-            if (first || pred == null) {
-                boolean locked = false;
-                try {
-                    if (shared) {
-                        // todo 共享锁的实现
-                    } else {
-                        locked = tryAcquire(arg);
-                    }
-                } catch (Throwable e) {
-                    // todo 取消获取锁的动作
-                    throw e;
-                }
-                if (locked) {
-                    if (first) { // 获取锁成功，如果是队头有效节点就解除该节点（队头是null的空节点，它的下一个节点才是有效的排队线程节点）
-                        node.prev = null;
-                        pred.next = null;
-                        head = node;
-                        node.waiter = null;
-                        if (shared) {
-                            signalNextQueueNodeWhenShared(node);
-                        }
-                        if (interrupted) {
-                            currentThread.isInterrupted();
-                        }
-                    }
-                    return 1;
-                }
+            Integer updated = tryOccupyAndUpdateState(node, arg, shared, first, pred, interrupted, currentThread);
+            if (updated != null) {
+                return updated;
             }
+
             QueueNode t;
             if ((t = tail) == null) { // 队列为空，则初始化队列头节点
-                if (tryInitQueueHeadNode() == null) {
-                    acquireOOME(shared, arg);
-                }
+                tryInitalizeQueue(arg, shared);
             } else if (node == null) { // 当前线程的节点为空，则初始化当前线程节点
-                try {
-                    node = shared ? new SharedNode() : new NoSharedNode();
-                } catch (OutOfMemoryError error) {
-                    acquireOOME(shared, arg);
-                }
+                tryInitalizeCurrentNode(node, arg, shared);
             } else if (pred == null) { // 当前线程还没有入队，则链接前驱节点进行入队操作
-                // 打包线程
-                node.waiter = currentThread;
-                // 将尾部节点设置为当前节点的前驱（还需要将尾部节点的后继设置为当前线程节点，才能实现两个节点的链接）
-                node.setPrevRelaxed(t);
-                // 尝试交换队列同步器中的尾部节点
-                if (casTail(t, node)) {
-                    // 交换成功则挂载成功
-                    t.next = node;
-                } else {
-                    // 挂载失败，当前节点未能成功入队，取消挂载
-                    node.setPrevRelaxed(null);
-                }
+                tryLinkAndCasTail(node, currentThread, t);
             } else if (first && spin != 0) {
                 --spin;
                 Thread.onSpinWait();
@@ -269,6 +227,99 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
             }
         }
         return cancelAcquire(node, interrupted, interruptible);
+    }
+
+    /**
+     * 初始化队列
+     * @apiNote 可能会出现初始化队列时 OOM异常，出现OOM时同步自旋获取锁直到获取成功
+     * @param arg arg参数是修改的状态值
+     * @param shared 是否是共享锁
+     */
+    private void tryInitalizeQueue(int arg, boolean shared) {
+        if (tryInitQueueHeadNode() == null) {
+            acquireOOME(shared, arg);
+        }
+    }
+
+    /**
+     * 尝试初始化当前线程节点
+     * @apiNote 可能会出现OOM异常，出现OOM时同步自旋获取锁直到获取成功
+     * @param node 节点
+     * @param arg arg参数是修改的状态值
+     * @param shared 是否是共享锁
+     */
+    private void tryInitalizeCurrentNode(QueueNode node, int arg, boolean shared) {
+        try {
+            node = shared ? new SharedNode() : new NoSharedNode();
+        } catch (OutOfMemoryError error) {
+            acquireOOME(shared, arg);
+        }
+    }
+
+    /**
+     * 尝试链接并CAS尾部节点
+     * @apiNote 即 将 node 挂载在队列的尾部，挂载失败时恢复 node前驱等于null的状态
+     * @param node 节点
+     * @param currentThread 当前线程
+     * @param t 尾部节点
+     */
+    private void tryLinkAndCasTail(QueueNode node, Thread currentThread, QueueNode t) {
+        // 打包线程
+        node.waiter = currentThread;
+        // 将尾部节点设置为当前节点的前驱（还需要将尾部节点的后继设置为当前线程节点，才能实现两个节点的链接）
+        node.setPrevRelaxed(t);
+        // 尝试交换队列同步器中的尾部节点
+        if (casTail(t, node)) {
+            // 交换成功则挂载成功
+            t.next = node;
+        } else {
+            // 挂载失败，当前节点未能成功入队，取消挂载
+            node.setPrevRelaxed(null);
+        }
+    }
+
+    /**
+     * 尝试占有锁
+     * @apiNote 当 当前节点是第一个有效节点 或 当前线程还没有入队进入阻塞时 尝试插队获取锁
+     * @param node 当前线程节点
+     * @param arg arg参数是修改的状态值
+     * @param shared 是否是共享锁
+     * @param first 是否是第一个有效节点
+     * @param pred 当前节点的前驱节点
+     * @param interrupted 是否响应中断
+     * @param currentThread 当前线程
+     * @return 获取锁的结果 0：获取锁失败，1：获取锁成功，null：不满足条件，跳过尝试获取锁的操作
+     */
+    private Integer tryOccupyAndUpdateState(QueueNode node, int arg, boolean shared, boolean first, QueueNode pred, boolean interrupted, Thread currentThread) {
+        if (first || pred == null) {
+            boolean locked = false;
+            try {
+                if (shared) {
+                    // todo 共享锁的实现
+                } else {
+                    locked = tryAcquire(arg);
+                }
+            } catch (Throwable e) {
+                // todo 取消获取锁的动作
+                throw e;
+            }
+            if (locked) {
+                if (first) { // 获取锁成功，如果是队头有效节点就解除该节点（队头是null的空节点，它的下一个节点才是有效的排队线程节点）
+                    node.prev = null;
+                    pred.next = null;
+                    head = node;
+                    node.waiter = null;
+                    if (shared) {
+                        signalNextQueueNodeWhenShared(node);
+                    }
+                    if (interrupted) {
+                        currentThread.isInterrupted();
+                    }
+                }
+                return 1;
+            }
+        }
+        return null;
     }
 
     /**
@@ -304,6 +355,10 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
 
     private int cancelAcquire(QueueNode node, boolean interrupted, boolean interruptible) {
         return 0;
+    }
+
+    private void cleanQueue() {
+
     }
 
     static class QueueNode {
@@ -408,7 +463,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
          */
         @Override
         public boolean isReleasable() {
-            return status <= 1 || Thread.currentThread().isInterrupted();
+            return status <= 1 || java.lang.Thread.currentThread().isInterrupted();
         }
     }
 
