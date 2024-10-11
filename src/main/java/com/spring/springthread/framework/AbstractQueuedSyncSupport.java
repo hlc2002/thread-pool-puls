@@ -1,8 +1,10 @@
 package com.spring.springthread.framework;
 
+import java.util.Queue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -208,7 +210,7 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                     throw e;
                 }
                 if (locked) {
-                    if (first) {
+                    if (first) { // 获取锁成功，如果是队头有效节点就解除该节点（队头是null的空节点，它的下一个节点才是有效的排队线程节点）
                         node.prev = null;
                         pred.next = null;
                         head = node;
@@ -224,6 +226,69 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                 }
             }
             QueueNode t;
+            if ((t = tail) == null) { // 队列为空，则初始化队列头节点
+                if (tryInitQueueHeadNode() == null) {
+                    acquireOOME(shared, arg);
+                }
+            } else if (node == null) { // 当前线程的节点为空，则初始化当前线程节点
+                try {
+                    node = shared ? new SharedNode() : new NoSharedNode();
+                } catch (OutOfMemoryError error) {
+                    acquireOOME(shared, arg);
+                }
+            } else if (pred == null) { // 当前线程还没有入队，则链接前驱节点进行入队操作
+                // 打包线程
+                node.waiter = currentThread;
+                // 将尾部节点设置为当前节点的前驱（还需要将尾部节点的后继设置为当前线程节点，才能实现两个节点的链接）
+                node.setPrevRelaxed(t);
+                // 尝试交换队列同步器中的尾部节点
+                if (casTail(t, node)) {
+                    // 交换成功则挂载成功
+                    t.next = node;
+                } else {
+                    // 挂载失败，当前节点未能成功入队，取消挂载
+                    node.setPrevRelaxed(null);
+                }
+            } else if (first && spin != 0) {
+                --spin;
+                Thread.onSpinWait();
+            } else if (node.status == 0) {
+                node.setStatusRelaxed(WAITING);
+            } else {
+                long nanos;
+                spin = postSpins = (byte) ((postSpins << 1) | 1);
+                if (!timed)
+                    LockSupport.park(this);
+                else if ((nanos = timeout - System.nanoTime()) > 0L)
+                    LockSupport.parkNanos(this, nanos);
+                else
+                    break;
+                node.clearStatus();
+                if ((interrupted |= Thread.interrupted()) && interruptible)
+                    break;
+            }
+        }
+        return cancelAcquire(node, interrupted, interruptible);
+    }
+
+    /**
+     * 无法创建节点时，内存不足时
+     *
+     * @param shared 是否是共享锁
+     * @param arg arg参数是修改的状态值
+     * @return 获取锁是否成功
+     */
+    private int acquireOOME(boolean shared, int arg) {
+        // 自旋获取锁
+        for (Long timeout = 0L; ; ) {
+            if (tryAcquire(arg)) {
+                return 1;
+            }
+            LockSupport.parkNanos(timeout);
+            // 2^30 次自旋等待，不断增加等待时间 或者 尝试获取锁成功
+            if (timeout < 1L << 30) {
+                timeout = timeout << 1;
+            }
         }
     }
 
@@ -234,6 +299,11 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
      */
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
+    }
+
+
+    private int cancelAcquire(QueueNode node, boolean interrupted, boolean interruptible) {
+        return 0;
     }
 
     static class QueueNode {
