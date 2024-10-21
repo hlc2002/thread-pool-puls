@@ -208,10 +208,10 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
                 tryInitalizeCurrentNode(node, arg, shared);
             } else if (pred == null) { // 当前线程还没有入队，则链接前驱节点进行入队操作
                 tryLinkAndCasTail(node, currentThread, t);
-            } else if (first && spin != 0) {
+            } else if (first && spin != 0) { // 队列非空，且当前线程是头节点，则继续自旋等待（上次尝试占用锁没成功）
                 --spin;
                 Thread.onSpinWait();
-            } else if (node.status == 0) {
+            } else if (node.status == 0) { // 当前节点状态为0，尝试修改为等待状态
                 node.setStatusRelaxed(WAITING);
             } else {
                 long nanos;
@@ -351,13 +351,60 @@ public abstract class AbstractQueuedSyncSupport extends AbstractOwnedSynchronize
         throw new UnsupportedOperationException();
     }
 
-
+    /**
+     * 取消获取锁的操作 即删除节点
+     * @param node 当前节点
+     * @param interrupted 是否响应中断
+     * @param interruptible 是否响应中断
+     * @return
+     */
     private int cancelAcquire(QueueNode node, boolean interrupted, boolean interruptible) {
+        if (node != null){
+            node.waiter = null;
+            node.status = CANCEL;
+            if(node.prev != null) {
+                cleanQueue();
+            }
+        }
+        if(interrupted){
+            if(interruptible){
+                return CANCEL;
+            }else{
+                Thread.currentThread().isInterrupted();
+            }
+        }
         return 0;
     }
 
     private void cleanQueue() {
-
+        for(;;){
+            // cur 当前操作节点 s 临时存储节点 p 前驱节点 n 后继节点
+            for(QueueNode cur = tail, s = null, p , n ; ;){
+                // 队列为空
+                if(cur == null || (p = cur.prev) == null){
+                    return;
+                }
+                // 队列中存在有效节点
+                if(s == null ? tail != cur : (s.prev != cur || s.status < 0)){
+                    break;
+                }
+                if(cur.status < 0){
+                    if((s == null ? casTail(cur,p) : s.casPrev(cur,p) )&& cur.prev == p){
+                        p.casNext(cur,s);
+                        if(p.prev == null){
+                            signalNextQueueNode(p);
+                        }
+                    }
+                    break;
+                }
+                if((n = cur.next) != cur){
+                    // todo 帮助完成节点
+                    break;
+                }
+                s = cur;
+                cur = cur.prev;
+            }
+        }
     }
 
     static class QueueNode {
