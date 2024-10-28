@@ -1,7 +1,5 @@
 package com.spring.springthread.datastruct.tree;
 
-import lombok.val;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
