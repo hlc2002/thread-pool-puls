@@ -62,5 +62,6 @@ public class PrefixSearchTree {
         tree.insetNewStr("abd");
         tree.insetNewStr("abf");
         System.out.println(tree.search("ab",true));
+        System.out.println(tree.search("ab",false));
     }
 }
