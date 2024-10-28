@@ -10,14 +10,41 @@ public class BalanceBinarySearchTree {
     /**
      * AVL平衡二叉搜索树
      */
-    public static class AvlTree{
+    public static class AvlTree {
+        private Node root;
 
+        public static class Node {
+            int data;
+            Node left;
+            Node right;
+            int height;
+
+            Node(int data) {
+                this.data = data;
+                height = 1;
+            }
+        }
     }
 
     /**
      * 红黑树
      */
-    public static class RBTree{
+    public static class RBTree {
+        private final static boolean RED = true;
+        private final static boolean BLACK = false;
+        private Node root;
 
+        public static class Node {
+            int data;
+            Node left;
+            Node right;
+            Node parent;
+            boolean color;
+
+            Node(int data, boolean color) {
+                this.data = data;
+                this.color = color;
+            }
+        }
     }
 }
