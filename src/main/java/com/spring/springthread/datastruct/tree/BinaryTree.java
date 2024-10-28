@@ -34,12 +34,10 @@ public class BinaryTree {
      * 根据前序与中序数组构建二叉树
      * @param preOrder 前序遍历
      * @param inOrder 中序遍历
-     * @return 树的根节点
+     * @return 树
      */
     public BinaryTree bulidByPreOrderAndInOrderArr(int[] preOrder,int[] inOrder){
-        Node node = bulidByPreOrderAndInOrder(preOrder, inOrder,
-                0, preOrder.length - 1,
-                0, inOrder.length - 1);
+        Node node = bulidByPreOrderAndInOrder(preOrder, inOrder, 0, preOrder.length - 1, 0, inOrder.length - 1);
         return new BinaryTree(node);
     }
 
@@ -58,13 +56,38 @@ public class BinaryTree {
                 inOrderRootIndex = i;
             }
         }
+        // 递归构建左右子树
+        Node left = bulidByPreOrderAndInOrder(preOrder,inOrder, preStart+1,inOrderRootIndex-inStart+preStart, inStart,inOrderRootIndex);
+        Node right = bulidByPreOrderAndInOrder(preOrder,inOrder, inOrderRootIndex-inStart+preStart+1, preEnd, inOrderRootIndex+1,inEnd);
+        root.left = left;
+        root.right = right;
+        return root;
+    }
 
-        Node left = bulidByPreOrderAndInOrder(preOrder,inOrder,
-                preStart+1,inOrderRootIndex-inStart+preStart,
-                inStart,inOrderRootIndex);
-        Node right = bulidByPreOrderAndInOrder(preOrder,inOrder,
-                inOrderRootIndex-inStart+preStart+1, preEnd,
-                inOrderRootIndex+1,inEnd);
+    /**
+     * 根据后序与中序构建二叉树
+     * @param postOrder 后序遍历
+     * @param inOrder 中序遍历
+     * @return 树
+     */
+    public BinaryTree buildByPostOrderAndInOrderArr(int[] postOrder,int[] inOrder){
+        Node node = bulidByPreOrderAndInOrder(postOrder, inOrder, 0, postOrder.length - 1, 0, inOrder.length - 1);
+        return new BinaryTree(node);
+    }
+    private Node buildByPostOrderAndInOrder(int[] postOrder, int[] inOrder, int postStart, int postEnd, int inStart, int inEnd){
+        if(postStart > postEnd || postEnd > postOrder.length - 1 || inStart > inEnd || inEnd > inOrder.length - 1){
+            return null; // 边界条件，返回空节点
+        }
+        Node root = new Node(postOrder[postEnd]);
+        int inOrderRootIndex = 0;
+        for(int i = inStart; i <= inEnd; i++){
+            if(inOrder[i] == root.data){
+                inOrderRootIndex = i;
+            }
+        }
+        // 递归构建左右子树
+        Node left = buildByPostOrderAndInOrder(postOrder,inOrder,postStart,inOrderRootIndex-1,inStart,inOrderRootIndex-1);
+        Node right = buildByPostOrderAndInOrder(postOrder,inOrder,inOrderRootIndex+1,postEnd-1,inOrderRootIndex+1,inEnd);
         root.left = left;
         root.right = right;
         return root;
@@ -114,5 +137,7 @@ public class BinaryTree {
         System.out.println(tree.order(tree.POST_ORDER));
         BinaryTree binaryTree = tree.bulidByPreOrderAndInOrderArr(new int[]{1, 2, 4, 5, 3, 6, 7}, new int[]{4, 2, 5, 1, 6, 3, 7});
         System.out.println(binaryTree.order(1));
+        tree.buildByPostOrderAndInOrderArr(new int[]{4,5,2,6,7,3,1},new int[]{4,2,5,6,7,3,1});
+        System.out.println(tree.order(1));
     }
 }
