@@ -15,7 +15,6 @@ public class PrefixSearchTree {
 
     public static class Node{
         Node[] arr;
-        char curr;
         boolean isEnd;
 
         Node(){
