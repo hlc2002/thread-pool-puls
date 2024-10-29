@@ -1,5 +1,7 @@
 package com.spring.springthread.datastruct.tree;
 
+import java.util.List;
+
 /**
  * @author spring
  * @since 2024/10/28 13:23:32
@@ -9,6 +11,9 @@ package com.spring.springthread.datastruct.tree;
 @SuppressWarnings("all")
 public class BalanceBinarySearchTree {
 
+    private final int PRE_ORDER = 1;
+    private final int IN_ORDER = 2;
+    private final int POST_ORDER = 3;
     public <T> T search(int value) {
         return null;
     }
@@ -16,6 +21,9 @@ public class BalanceBinarySearchTree {
 
     }
     public <T> T delete(){
+        return null;
+    }
+    public List<Integer> order(int type){
         return null;
     }
     /**
@@ -49,6 +57,11 @@ public class BalanceBinarySearchTree {
         @Override
         public Node delete() {
             return super.delete();
+        }
+
+        @Override
+        public List<Integer> order(int type) {
+            return super.order(type);
         }
     }
 
@@ -86,6 +99,11 @@ public class BalanceBinarySearchTree {
         @Override
         public Node delete() {
             return super.delete();
+        }
+
+        @Override
+        public List<Integer> order(int type) {
+            return super.order(type);
         }
     }
 }
