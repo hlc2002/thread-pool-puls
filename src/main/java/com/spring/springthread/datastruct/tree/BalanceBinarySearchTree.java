@@ -6,11 +6,22 @@ package com.spring.springthread.datastruct.tree;
  * @apiNote 平衡二叉搜索树
  * @version 1.0
  */
+@SuppressWarnings("all")
 public class BalanceBinarySearchTree {
+
+    public <T> T search(int value) {
+        return null;
+    }
+    public void add(int value){
+
+    }
+    public <T> T delete(){
+        return null;
+    }
     /**
      * AVL平衡二叉搜索树
      */
-    public static class AvlTree {
+    public class AvlTree extends BalanceBinarySearchTree{
         private Node root;
 
         public static class Node {
@@ -24,12 +35,27 @@ public class BalanceBinarySearchTree {
                 height = 1;
             }
         }
+
+        @Override
+        public Node search(int value) {
+            return super.search(value);
+        }
+
+        @Override
+        public void add(int value) {
+            super.add(value);
+        }
+
+        @Override
+        public Node delete() {
+            return super.delete();
+        }
     }
 
     /**
      * 红黑树
      */
-    public static class RBTree {
+    public class RBTree extends BalanceBinarySearchTree{
         private final static boolean RED = true;
         private final static boolean BLACK = false;
         private Node root;
@@ -45,6 +71,21 @@ public class BalanceBinarySearchTree {
                 this.data = data;
                 this.color = color;
             }
+        }
+
+        @Override
+        public Node search(int value) {
+            return super.search(value);
+        }
+
+        @Override
+        public void add(int value) {
+            super.add(value);
+        }
+
+        @Override
+        public Node delete() {
+            return super.delete();
         }
     }
 }
