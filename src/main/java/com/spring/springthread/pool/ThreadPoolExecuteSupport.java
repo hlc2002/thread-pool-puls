@@ -429,11 +429,11 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
         Thread currentThread = Thread.currentThread();
         Runnable task = worker.firstTask;
         worker.firstTask = null; // 当firstTask等于空时，说明该worker已经进入工作状态，不为空时是说明该worker刚创建完毕
-        worker.unlock(); // 允许添加新的task任务（第一次执行worker的run方法时 此代码的作用是将 state 置为 0 意思就是进入运行时 -1 是中断时）
+        worker.unlock(); // 允许添加新的task任务（第一次执行worker的run方法时 此代码的作用是将 state 置为 0 即当前可进入锁 -1 是中断锁）
         boolean completedAbruptly = true; // 允许中断
         try {
             while (task != null || (task = getTask()) != null) {
-                worker.lock(); // 不允许添加新的task任务 此时会将 state 置为 1 意思就是 阻塞中（有任务在执行）
+                worker.lock(); // 不允许添加新的task任务 此时会将 state 置为 1 即 阻塞其他线程（有任务在执行）
                 if ((ctl.get() >= STOP || Thread.interrupted() && ctl.get() >= STOP) && !currentThread.isInterrupted()) {
                     currentThread.interrupt();
                 }
@@ -448,7 +448,7 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
                     }
                 } finally {
                     task = null;
-                    worker.completedTasks++; // 记录工作线程 已经完成的任务数量
+                    worker.completedTasks ++; // 记录工作线程 已经完成的任务数量
                     worker.unlock(); // 也允许添加新的task任务 将 state 置为 0
                 }
             }
@@ -554,31 +554,28 @@ public class ThreadPoolExecuteSupport extends AbstractExecuteSupport {
     }
 
     public static void main0() {
-        ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 3, 10,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(100));
-        CountDownLatch countDownLatch = new CountDownLatch(2);
-        threadPoolExecuteSupport.execute(() -> {
-            try {
-                countDownLatch.await();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            System.out.println("hello world ! " + 1);
-        });
-        threadPoolExecuteSupport.execute(() -> {
-            System.out.println("hello world ! " + 2);
-            countDownLatch.countDown();
-        });
-        threadPoolExecuteSupport.execute(() -> {
-            System.out.println("hello world ! " + 3);
-            countDownLatch.countDown();
-        });
-        threadPoolExecuteSupport.execute(() -> {
-            System.out.println("hello world ! " + 4);
-        });
-        threadPoolExecuteSupport.execute(() -> {
-            System.out.println("hello world ! " + 5);
-        });
-        threadPoolExecuteSupport.shutdown();
+        try (ThreadPoolExecuteSupport threadPoolExecuteSupport = new ThreadPoolExecuteSupport(2, 3, 10,
+                TimeUnit.SECONDS, new LinkedBlockingQueue<>(100))) {
+            CountDownLatch countDownLatch = new CountDownLatch(2);
+            threadPoolExecuteSupport.execute(() -> {
+                try {
+                    countDownLatch.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                System.out.println("hello world ! " + 1);
+            });
+            threadPoolExecuteSupport.execute(() -> {
+                System.out.println("hello world ! " + 2);
+                countDownLatch.countDown();
+            });
+            threadPoolExecuteSupport.execute(() -> {
+                System.out.println("hello world ! " + 3);
+                countDownLatch.countDown();
+            });
+            threadPoolExecuteSupport.execute(() -> System.out.println("hello world ! " + 4));
+            threadPoolExecuteSupport.execute(() -> System.out.println("hello world ! " + 5));
+            threadPoolExecuteSupport.shutdown();
+        }
     }
 }
