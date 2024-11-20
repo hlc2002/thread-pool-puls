@@ -1,5 +1,8 @@
 package com.spring.springthread;
 
+import lombok.Data;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -101,8 +104,22 @@ public class StringComparator {
         assert compareLeftBiggerByNumberBits("20241121", "20241120-11-1") == 1;
         assert compareLeftBiggerByNumberBits("20241120", "20241119") == 1;
 
-        List<String> strList = List.of("20241120-10032-1", "20241120-10032-2", "20241120-10032-3", "20241120-10032-4", "20241120-10032-5", "20241120-10032-6", "20241120-10032-7", "20241120-10032-8", "20241120-10032-9", "20241120-10032-10");
-        sortByMapperStringField(strList, String::toString, true, false);
-        System.out.println(strList);
+
+        List<ObjStr> list = new ArrayList<>();
+        list.add(new ObjStr("20241120-10032-1", 1));
+        list.add(new ObjStr("20241120-10032-2", 2));
+        list.add(new ObjStr("20241120-10032-3", 3));
+        sortByMapperStringField(list, ObjStr::getStr, true, false);
+        System.out.println(list);
+    }
+
+    @Data
+    public static class ObjStr{
+        private String str;
+        private int num;
+        public ObjStr(String str, int num){
+            this.str = str;
+            this.num = num;
+        }
     }
 }
