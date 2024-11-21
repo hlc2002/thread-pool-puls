@@ -2,8 +2,7 @@ package com.spring.springthread;
 
 import lombok.Data;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * @author: jd-jsj-spring
@@ -18,46 +17,99 @@ public class StringComparator {
         R getMappedValue(T t);
     }
 
+
     /**
-     * 根据字符串映射字段进行排序，默认升序，字典序
+     * 根据字符串字段进行排序 不分组 字典序
      *
-     * @param objectList   待排序对象列表
+     * @param objectList   待排序的列表
      * @param stringMapper 字符串映射函数
-     * @return 排序后的对象列表
+     * @param ascending    是否升序
+     * @param <T>          泛型
+     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringField(List<T> objectList, Mapper<T, String> stringMapper) {
-        return sortByMapperStringField(objectList, stringMapper, true);
+    public static <T> List<T> sortByMapperStringFieldNoGroupOrderByDict(List<T> objectList,
+                                                                        Mapper<T, String> stringMapper,
+                                                                        boolean ascending) {
+        return sortByMapperStringField(objectList, stringMapper, ascending, false, false, "", null);
     }
 
     /**
-     * 根据字符串映射字段进行排序，默认升序，字典序
+     * 根据字符串字段进行排序 不分组
      *
-     * @param objectList   待排序对象列表
+     * @param objectList   待排序的列表
      * @param stringMapper 字符串映射函数
      * @param ascending    是否升序
-     * @return 排序后的对象列表
+     * @param dictionary   是否字典排序
+     * @param <T>          泛型
+     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringField(List<T> objectList, Mapper<T, String> stringMapper, boolean ascending) {
-        return sortByMapperStringField(objectList, stringMapper, ascending, true);
+    public static <T> List<T> sortByMapperStringFieldNoGrouping(List<T> objectList,
+                                                                Mapper<T, String> stringMapper,
+                                                                boolean ascending,
+                                                                boolean dictionary) {
+        return sortByMapperStringField(objectList, stringMapper, ascending, dictionary, false, "", null);
     }
 
     /**
-     * 根据字符串映射字段进行排序
+     * 根据字符串字段进行排序
      *
-     * @param objectList   待排序对象列表
-     * @param stringMapper 字符串映射函数
-     * @param ascending    是否升序
-     * @param dictionary   是否按照字典顺序排序
-     * @return 排序后的对象列表
+     * @param objectList            待排序的列表
+     * @param stringMapper          字符串映射函数
+     * @param ascending             是否升序
+     * @param dictionary            是否字典排序
+     * @param fieldExistGroupFlag   字段是否存在分组
+     * @param groupFlag             分组标识
+     * @param filterGroupIndexArray 过滤的分组索引
+     * @param <T>                   泛型
+     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringField(List<T> objectList, Mapper<T, String> stringMapper, boolean ascending, boolean dictionary) {
+    public static <T> List<T> sortByMapperStringField(List<T> objectList,
+                                                      Mapper<T, String> stringMapper,
+                                                      boolean ascending,
+                                                      boolean dictionary,
+                                                      boolean fieldExistGroupFlag,
+                                                      String groupFlag,
+                                                      List<Integer> filterGroupIndexArray) {
         if (null == objectList || objectList.isEmpty())
             return objectList;
-        objectList.sort((o1, o2) -> ascending
-                ? dictionary ? compareLeftBiggerByDict(stringMapper.getMappedValue(o1), stringMapper.getMappedValue(o2))
-                        : compareLeftBiggerByAsciiBits(stringMapper.getMappedValue(o1), stringMapper.getMappedValue(o2))
-                : dictionary ? compareLeftBiggerByDict(stringMapper.getMappedValue(o2), stringMapper.getMappedValue(o1))
-                        : compareLeftBiggerByAsciiBits(stringMapper.getMappedValue(o2), stringMapper.getMappedValue(o1)));
+        objectList.sort((group1, group2) -> {
+            String mappedValue1 = stringMapper.getMappedValue(group1), mappedValue2 = stringMapper.getMappedValue(group2);
+            if (mappedValue1 == null || mappedValue1.isEmpty()) {
+                return mappedValue2 == null || mappedValue2.isEmpty() ? 0 : -1;
+            }
+            if (mappedValue2 == null || mappedValue2.isEmpty()) {
+                return 1;
+            }
+            if (!fieldExistGroupFlag) {
+                return dictionary
+                        ? ascending
+                        ? compareLeftBiggerByDict(mappedValue1, mappedValue2)
+                        : compareLeftBiggerByDict(mappedValue2, mappedValue1)
+                        : ascending
+                        ? compareLeftBiggerByAsciiBits(mappedValue1, mappedValue2)
+                        : compareLeftBiggerByAsciiBits(mappedValue2, mappedValue1);
+            }
+
+            String[] mappedArr1 = mappedValue1.split(groupFlag), mappedArr2 = mappedValue2.split(groupFlag);
+
+            List<String> mappedArr1List = new LinkedList<>(), mappedArr2List = new LinkedList<>();
+            for (int i = 0, j = 0; i < mappedArr1.length || j < mappedArr2.length; i++, j++) {
+                if (i < mappedArr1.length && !filterGroupIndexArray.contains(i)) {
+                    mappedArr1List.add(mappedArr1[i]);
+                }
+                if (j < mappedArr2.length && !filterGroupIndexArray.contains(j)) {
+                    mappedArr2List.add(mappedArr2[j]);
+                }
+            }
+            String mappedValue1Str = String.join("", mappedArr1List), mappedValue2Str = String.join("", mappedArr2List);
+            return dictionary
+                    ? ascending
+                    ? compareLeftBiggerByDict(mappedValue1Str, mappedValue2Str)
+                    : compareLeftBiggerByDict(mappedValue2Str, mappedValue1Str)
+                    : ascending
+                    ? compareLeftBiggerByAsciiBits(mappedValue1Str, mappedValue2Str)
+                    : compareLeftBiggerByAsciiBits(mappedValue2Str, mappedValue1Str);
+        });
         return objectList;
     }
 
@@ -84,33 +136,26 @@ public class StringComparator {
     public static int compareLeftBiggerByAsciiBits(String str1, String str2) {
         if (str1 == null || str2 == null)
             throw new IllegalArgumentException("arg list exist null str");
-        int sum = 0;
-        for (int i = 0; i < str1.length() && i < str2.length(); i++) {
-            sum += str1.charAt(i) - str2.charAt(i);
-        }
-        if (str1.length() == str2.length()) {
-            return sum;
-        }
-        return sum == 0 ?  str1.length() > str2.length() ? 1 : str1.length() - str2.length() : sum;
+        return Integer.valueOf(str1).compareTo(Integer.valueOf(str2));
     }
 
     public static void main(String[] args) {
-        System.out.println(compareLeftBiggerByDict("20241120-10032-1", "20241120-10032-2"));
-        System.out.println(compareLeftBiggerByAsciiBits("20241120-10032-10", "20241120-10032-2"));
 
         List<ObjStr> list = new ArrayList<>();
         list.add(new ObjStr("20241120-10032-1", 1));
-        list.add(new ObjStr("20241120-10032-2", 2));
-        list.add(new ObjStr("20241120-10032-3", 3));
-        sortByMapperStringField(list, ObjStr::getStr, true, false);
+        list.add(new ObjStr("20241120", 2));
+        list.add(new ObjStr("20241120-10031-3", 3));
+        list.add(new ObjStr("20241120-10031-20", 4));
+        sortByMapperStringField(list, ObjStr::getStr, true, false, true, "-", Collections.singletonList(1));
         System.out.println(list);
     }
 
     @Data
-    public static class ObjStr{
+    public static class ObjStr {
         private String str;
         private int num;
-        public ObjStr(String str, int num){
+
+        public ObjStr(String str, int num) {
             this.str = str;
             this.num = num;
         }
