@@ -25,12 +25,11 @@ public class StringComparator {
      * @param stringMapper 字符串映射函数
      * @param ascending    是否升序
      * @param <T>          泛型
-     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringFieldNoGroupOrderByDict(List<T> objectList,
-                                                                        Mapper<T, String> stringMapper,
-                                                                        boolean ascending) {
-        return sortByMapperStringField(objectList, stringMapper, ascending, false, false, "", null);
+    public static <T> void sortByMapperStringFieldNoGroupOrderByDict(List<T> objectList,
+                                                                     Mapper<T, String> stringMapper,
+                                                                     boolean ascending) {
+        sortByMapperStringField(objectList, stringMapper, ascending, false, false, "", null);
     }
 
     /**
@@ -41,13 +40,12 @@ public class StringComparator {
      * @param ascending    是否升序
      * @param dictionary   是否字典排序
      * @param <T>          泛型
-     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringFieldNoGrouping(List<T> objectList,
-                                                                Mapper<T, String> stringMapper,
-                                                                boolean ascending,
-                                                                boolean dictionary) {
-        return sortByMapperStringField(objectList, stringMapper, ascending, dictionary, false, "", null);
+    public static <T> void sortByMapperStringFieldNoGrouping(List<T> objectList,
+                                                             Mapper<T, String> stringMapper,
+                                                             boolean ascending,
+                                                             boolean dictionary) {
+        sortByMapperStringField(objectList, stringMapper, ascending, dictionary, false, "", null);
     }
 
     /**
@@ -61,17 +59,16 @@ public class StringComparator {
      * @param groupFlag             分组标识
      * @param filterGroupIndexArray 过滤的分组索引
      * @param <T>                   泛型
-     * @return 排序后的列表
      */
-    public static <T> List<T> sortByMapperStringField(List<T> objectList,
-                                                      Mapper<T, String> stringMapper,
-                                                      boolean ascending,
-                                                      boolean dictionary,
-                                                      boolean fieldExistGroupFlag,
-                                                      String groupFlag,
-                                                      List<Integer> filterGroupIndexArray) {
+    public static <T> void sortByMapperStringField(List<T> objectList,
+                                                   Mapper<T, String> stringMapper,
+                                                   boolean ascending,
+                                                   boolean dictionary,
+                                                   boolean fieldExistGroupFlag,
+                                                   String groupFlag,
+                                                   List<Integer> filterGroupIndexArray) {
         if (null == objectList || objectList.isEmpty())
-            return objectList;
+            throw new IllegalArgumentException("arg list is empty");
         objectList.sort((group1, group2) -> {
             String mappedValue1 = stringMapper.getMappedValue(group1), mappedValue2 = stringMapper.getMappedValue(group2);
             if (mappedValue1 == null || mappedValue1.isEmpty()) {
@@ -86,8 +83,8 @@ public class StringComparator {
                         ? compareLeftBiggerByDict(mappedValue1, mappedValue2)
                         : compareLeftBiggerByDict(mappedValue2, mappedValue1)
                         : ascending
-                        ? compareLeftBiggerByAsciiBits(mappedValue1, mappedValue2)
-                        : compareLeftBiggerByAsciiBits(mappedValue2, mappedValue1);
+                        ? compareLeftBiggerByNumValue(mappedValue1, mappedValue2)
+                        : compareLeftBiggerByNumValue(mappedValue2, mappedValue1);
             }
 
             String[] mappedArr1 = mappedValue1.split(groupFlag), mappedArr2 = mappedValue2.split(groupFlag);
@@ -107,10 +104,9 @@ public class StringComparator {
                     ? compareLeftBiggerByDict(mappedValue1Str, mappedValue2Str)
                     : compareLeftBiggerByDict(mappedValue2Str, mappedValue1Str)
                     : ascending
-                    ? compareLeftBiggerByAsciiBits(mappedValue1Str, mappedValue2Str)
-                    : compareLeftBiggerByAsciiBits(mappedValue2Str, mappedValue1Str);
+                    ? compareLeftBiggerByNumValue(mappedValue1Str, mappedValue2Str)
+                    : compareLeftBiggerByNumValue(mappedValue2Str, mappedValue1Str);
         });
-        return objectList;
     }
 
     /**
@@ -133,14 +129,14 @@ public class StringComparator {
      * @param str2 字符串2
      * @return 比较结果，正数 表示 str1 大于 str2，负数 表示 str1 小于 str2，0 表示相等
      */
-    public static int compareLeftBiggerByAsciiBits(String str1, String str2) {
+    public static int compareLeftBiggerByNumValue(String str1, String str2) {
         if (str1 == null || str2 == null)
             throw new IllegalArgumentException("arg list exist null str");
         return Integer.valueOf(str1).compareTo(Integer.valueOf(str2));
     }
 
     public static void main(String[] args) {
-
+        // 存在分组情况
         List<ObjStr> list = new ArrayList<>();
         list.add(new ObjStr("20241120-10032-1", 1));
         list.add(new ObjStr("20241120", 2));
@@ -148,6 +144,13 @@ public class StringComparator {
         list.add(new ObjStr("20241120-10031-20", 4));
         sortByMapperStringField(list, ObjStr::getStr, true, false, true, "-", Collections.singletonList(1));
         System.out.println(list);
+        // 不存在分组情况
+        List<ObjStr> list2 = new ArrayList<>();
+        list2.add(new ObjStr("202411212", 1));
+        list2.add(new ObjStr("20241120", 2));
+        list2.add(new ObjStr("20241123", 3));
+        sortByMapperStringFieldNoGrouping(list2, ObjStr::getStr, true, false);
+        System.out.println(list2);
     }
 
     @Data
