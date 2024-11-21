@@ -55,9 +55,9 @@ public class StringComparator {
             return objectList;
         objectList.sort((o1, o2) -> ascending
                 ? dictionary ? compareLeftBiggerByDict(stringMapper.getMappedValue(o1), stringMapper.getMappedValue(o2))
-                        : compareLeftBiggerByNumberBits(stringMapper.getMappedValue(o1), stringMapper.getMappedValue(o2))
+                        : compareLeftBiggerByAsciiBits(stringMapper.getMappedValue(o1), stringMapper.getMappedValue(o2))
                 : dictionary ? compareLeftBiggerByDict(stringMapper.getMappedValue(o2), stringMapper.getMappedValue(o1))
-                        : compareLeftBiggerByNumberBits(stringMapper.getMappedValue(o2), stringMapper.getMappedValue(o1)));
+                        : compareLeftBiggerByAsciiBits(stringMapper.getMappedValue(o2), stringMapper.getMappedValue(o1)));
         return objectList;
     }
 
@@ -81,7 +81,7 @@ public class StringComparator {
      * @param str2 字符串2
      * @return 比较结果，正数 表示 str1 大于 str2，负数 表示 str1 小于 str2，0 表示相等
      */
-    public static int compareLeftBiggerByNumberBits(String str1, String str2) {
+    public static int compareLeftBiggerByAsciiBits(String str1, String str2) {
         if (str1 == null || str2 == null)
             throw new IllegalArgumentException("arg list exist null str");
         int sum = 0;
@@ -95,14 +95,14 @@ public class StringComparator {
     }
 
     public static void main(String[] args) {
-        assert compareLeftBiggerByNumberBits("20241120-10032-1", "20241120-10032-2") == -1;
-        assert compareLeftBiggerByNumberBits("20241120-10032-2", "20241120-10032-1") == 1;
-        assert compareLeftBiggerByNumberBits("20241120-10032-2", "20241120-10032-2") == 0;
-        assert compareLeftBiggerByNumberBits("20241120-10032", "20241120-10032-3") == -1;
-        assert compareLeftBiggerByNumberBits("20241120-10032-3", "20241120-10032") == 1;
-        assert compareLeftBiggerByNumberBits("20241120-10032-3", "20241120-10032-3") == 0;
-        assert compareLeftBiggerByNumberBits("20241121", "20241120-11-1") == 1;
-        assert compareLeftBiggerByNumberBits("20241120", "20241119") == 1;
+        assert compareLeftBiggerByAsciiBits("20241120-10032-1", "20241120-10032-2") == -1;
+        assert compareLeftBiggerByAsciiBits("20241120-10032-2", "20241120-10032-1") == 1;
+        assert compareLeftBiggerByAsciiBits("20241120-10032-2", "20241120-10032-2") == 0;
+        assert compareLeftBiggerByAsciiBits("20241120-10032", "20241120-10032-3") == -1;
+        assert compareLeftBiggerByAsciiBits("20241120-10032-3", "20241120-10032") == 1;
+        assert compareLeftBiggerByAsciiBits("20241120-10032-3", "20241120-10032-3") == 0;
+        assert compareLeftBiggerByAsciiBits("20241121", "20241120-11-1") == 1;
+        assert compareLeftBiggerByAsciiBits("20241120", "20241119") == 1;
 
 
         List<ObjStr> list = new ArrayList<>();
