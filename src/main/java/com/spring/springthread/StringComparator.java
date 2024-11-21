@@ -137,7 +137,7 @@ public class StringComparator {
         if (str1.matches("\\d+") && str2.matches("\\d+")) {
             return Integer.valueOf(str1).compareTo(Integer.valueOf(str2));
         }
-        return 0;
+        return str1.matches("\\d+") ? 1 : str2.matches("\\d+") ? -1 : 0;
     }
 
     public static void main(String[] args) {
@@ -147,6 +147,7 @@ public class StringComparator {
         list.add(new ObjStr("20241120", 2));
         list.add(new ObjStr("20241120-10031-3", 3));
         list.add(new ObjStr("20241120-10031-20", 4));
+        list.add(new ObjStr("20241120-10031", 5));
         sortByMapperStringField(list, ObjStr::getStr, true, false, true, "-", Collections.singletonList(1));
         System.out.println(list);
         // 不存在分组情况
@@ -154,6 +155,8 @@ public class StringComparator {
         list2.add(new ObjStr("202411212", 1));
         list2.add(new ObjStr("20241120", 2));
         list2.add(new ObjStr("20241123", 3));
+        list2.add(new ObjStr(null, 4));
+        list2.add(new ObjStr("wdadadsa", 5));
         sortByMapperStringFieldNoGrouping(list2, ObjStr::getStr, true, false);
         System.out.println(list2);
     }
