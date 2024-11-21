@@ -3,8 +3,6 @@ package com.spring.springthread;
 import lombok.Data;
 
 import java.util.*;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 /**
  * @author: jd-jsj-spring
@@ -31,7 +29,7 @@ public class StringComparator {
     public static <T> void sortByMapperStringFieldNoGroupOrderByDict(List<T> objectList,
                                                                      Mapper<T, String> stringMapper,
                                                                      boolean ascending) {
-        sortByMapperStringField(objectList, stringMapper, ascending, false, false, "", null);
+        sortByMapperStringField(objectList, stringMapper, ascending, true, false, "", null);
     }
 
     /**
@@ -150,6 +148,8 @@ public class StringComparator {
         list.add(new ObjStr("20241120-10031", 5));
         sortByMapperStringField(list, ObjStr::getStr, true, false, true, "-", Collections.singletonList(1));
         System.out.println(list);
+        sortByMapperStringField(list, ObjStr::getStr,true,false,true,"-",Collections.singletonList(0));
+        System.out.println(list);
         // 不存在分组情况
         List<ObjStr> list2 = new ArrayList<>();
         list2.add(new ObjStr("202411212", 1));
@@ -157,7 +157,10 @@ public class StringComparator {
         list2.add(new ObjStr("20241123", 3));
         list2.add(new ObjStr(null, 4));
         list2.add(new ObjStr("wdadadsa", 5));
+        list2.add(new ObjStr("2231312-2131-11", 6));
         sortByMapperStringFieldNoGrouping(list2, ObjStr::getStr, true, false);
+        System.out.println(list2);
+        sortByMapperStringFieldNoGroupOrderByDict(list2, ObjStr::getStr, true);
         System.out.println(list2);
     }
 
