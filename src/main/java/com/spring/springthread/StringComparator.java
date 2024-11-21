@@ -131,7 +131,15 @@ public class StringComparator {
      */
     public static int compareLeftBiggerByNumValue(String str1, String str2) {
         if (str1 == null || str2 == null)
-            throw new IllegalArgumentException("arg list exist null str");
+            return 0;
+        for (int i = 0, j = 0; i < str1.length() || j < str2.length(); i++, j++) {
+            if (i < str1.length() && !Character.isDigit(str1.charAt(i))) {
+                return 0;
+            }
+            if (j < str2.length() && !Character.isDigit(str2.charAt(j))) {
+                return 0;
+            }
+        }
         return Integer.valueOf(str1).compareTo(Integer.valueOf(str2));
     }
 
