@@ -13,10 +13,12 @@ import java.util.concurrent.RejectedExecutionException;
 public class DefaultRejectedHandler implements RejectedHandler {
     @Override
     public void rejected(Runnable task, ExecuteSupport executor) {
-        if (task == null)
+        if (task == null) {
             throw new NullPointerException("task is null !");
-        if (executor.isShutdown())
+        }
+        if (executor.isShutdown()) {
             throw new RejectedExecutionException("executor is shutdown !");
+        }
         throw new RejectedExecutionException("task is rejected !");
     }
 }
